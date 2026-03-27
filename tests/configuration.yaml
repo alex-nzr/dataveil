@@ -1,0 +1,82 @@
+version: 1.0
+
+database:
+    source: "bitrix_settings"
+    bitrix:
+        settings_file: "/home/bitrix/www/bitrix/.settings.php"
+        connection_name: "default"
+
+rules:
+    tables:
+        - name: "b_search_content"
+          action: "truncate"
+          comment: "Search index - safe to delete"
+
+        - name: "b_user"
+          action: "update"
+          fields:
+              - column: "EMAIL"
+                strategy: "email_fake"
+              - column: "LOGIN"
+                strategy: "string_random"
+                options: { length: 10, prefix: "user_" }
+              - column: "NAME"
+                strategy: "name_fake"
+              - column: "LAST_NAME"
+                strategy: "lastname_fake"
+              - column: "PERSONAL_PHONE"
+                strategy: "phone_fake"
+          where: "ID NOT IN (1)"
+
+consistency_groups:
+    - id: "crm_phone_unique"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+          context_columns: ["ENTITY_ID", "VALUE", "TYPE_ID"]
+          filters:
+              - column: "TYPE_ID"
+                value: "PHONE"
+      generator:
+          deterministic: true
+          strategy: "phone_fake"
+          salt_source: "row_id"
+      targets:
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            join: { key_column: "ID", ref_column: "ID" }
+          - table: "b_crm_act_comm"
+            column: "ENTITY_SETTINGS"
+            join:
+                type: "serialized_value_match"
+                entity_id_column: "OWNER_ID"
+            serialization:
+                type: "php_serialize"
+                match_key: "PHONE"
+                match_value_source: "anchor.VALUE"
+
+    - id: "crm_email_unique"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+          context_columns: ["ENTITY_ID", "VALUE", "TYPE_ID"]
+          filters:
+              - column: "TYPE_ID"
+                value: "EMAIL"
+      generator:
+          deterministic: true
+          strategy: "email_fake"
+          salt_source: "row_id"
+      targets:
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            join: { key_column: "ID", ref_column: "ID" }
+          - table: "b_crm_act_comm"
+            column: "ENTITY_SETTINGS"
+            join:
+                type: "serialized_value_match"
+                entity_id_column: "OWNER_ID"
+            serialization:
+                type: "php_serialize"
+                match_key: "EMAIL"
+                match_value_source: "anchor.VALUE"

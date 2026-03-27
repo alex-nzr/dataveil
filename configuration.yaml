@@ -1,0 +1,120 @@
+version: 1.0
+
+database:
+    source: "bitrix_settings"
+    bitrix:
+        settings_file: "/home/bitrix/www/bitrix/.settings.php"
+        connection_name: "default"
+
+rules:
+    # ... (обычные правила для таблиц, которые не требуют синхронизации) ...
+    tables:
+        - name: "b_search_content"
+          action: "truncate"
+          comment: "Индекс поиска, безопасно удалять, перестроится"
+
+        - name: "b_user"
+          action: "update"
+          fields:
+              - column: "EMAIL"
+                strategy: "email_fake" # Генерация вида user_{id}@fake.local
+              - column: "LOGIN"
+                strategy: "string_random"
+                options: { length: 10, prefix: "user_" }
+              - column: "NAME"
+                strategy: "name_fake"
+              - column: "LAST_NAME"
+                strategy: "lastname_fake"
+              - column: "PERSONAL_PHONE"
+                strategy: "phone_fake"
+          # Исключения (какие записи не трогать)
+          where: "ID NOT IN (1)"
+consistency_groups:
+    # Группа: Телефоны (Гранулярность по записи в мультиполях)
+    - id: "crm_phone_unique"
+      comment: "Каждый телефон в мультиполях получает уникальный фейк. История звонков сопоставляется по значению."
+
+      # 1. Источник (Якорь) - теперь это конкретная запись телефона, а не просто Контакт
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID" # Уникальность по ID строки
+          # Нам нужно знать, к какому контакту относится телефон, для связи с историей
+          context_columns: # Подгружаем эти поля для использования в логике
+              - "ENTITY_ID" # ID Контакта
+              - "VALUE" # Оригинальный номер (нужен для поиска в истории)
+              - "TYPE_ID" # Тип (PHONE)
+          filters:
+              - column: "TYPE_ID"
+                value: "PHONE"
+
+      # 2. Генератор
+      generator:
+          # deterministic: true гарантирует, что для строки ID=55 всегда будет один и тот же фейк
+          # даже если скрипт запущен дважды. Это важно для консистентности.
+          deterministic: true
+          strategy: "phone_fake"
+          # Соль может включать ID строки, чтобы номера не повторялись
+          salt_source: "row_id"
+
+      # 3. Цели (Куда записать сгенерированное значение)
+      targets:
+          # 3.1. Обновляем саму таблицу мультиполей (источник истины)
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            # Так как таблица совпадает с anchor, просто обновляем по ID
+            join:
+                key_column: "ID"
+                ref_column: "ID"
+
+          # 3.2. Обновляем историю коммуникаций (b_crm_act_comm)
+          - table: "b_crm_act_comm"
+            column: "ENTITY_SETTINGS"
+            # Сложная связь: мы не можем джойнить по ID.
+            # Мы должны найти в истории записи, где в настройках был ЭТОТ конкретный номер.
+            join:
+                type: "serialized_value_match" # Специальный тип джойна для скрипта
+                entity_id_column: "OWNER_ID" # Сначала фильтруем по владельцу (Контакту)
+                ref_entity_column: "ENTITY_ID" # Из anchor.context_columns
+                filters:
+                    - column: "OWNER_TYPE_ID"
+                      value: "3" # Contact
+            serialization:
+                type: "php_serialize"
+                # Ищем в сериализованном массиве ключ PHONE, значение которого совпадает с anchor.VALUE
+                match_key: "PHONE"
+                match_value_source: "anchor.VALUE" # Сравниваем со старым номером из якоря
+                replace: true # Если нашли совпадение - заменяем на новое значение из генератора
+
+    # Группа: Email (Аналогично, но проще, так как email обычно уникален)
+    - id: "crm_email_unique"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+          context_columns:
+              - "ENTITY_ID"
+              - "VALUE"
+          filters:
+              - column: "TYPE_ID"
+                value: "EMAIL"
+      generator:
+          deterministic: true
+          strategy: "email_fake"
+          salt_source: "row_id"
+      targets:
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            join: { key_column: "ID", ref_column: "ID" }
+          - table: "b_crm_act_comm"
+            column: "ENTITY_SETTINGS"
+            join:
+                type: "serialized_value_match"
+                entity_id_column: "OWNER_ID"
+                ref_entity_column: "ENTITY_ID"
+                filters:
+                    - column: "OWNER_TYPE_ID"
+                      value: "3"
+            serialization:
+                type: "php_serialize"
+                match_key: "EMAIL"
+                match_value_source: "anchor.VALUE"
+                replace: true

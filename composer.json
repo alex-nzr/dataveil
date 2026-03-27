@@ -1,0 +1,41 @@
+{
+    "name": "flah/dataveil",
+    "description": "Bitrix database anonymization CLI tool",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Andrei Nikolaev",
+            "email": "gromdron@yandex.ru"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "symfony/console": "^6.4",
+        "symfony/yaml": "^6.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "phpstan/phpstan": "^1.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "DataVeil\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DataVeil\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse src --level=8",
+        "build:phar": "box compile"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}

@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DataVeil\Command;
+
+use DataVeil\Config\Configuration;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+#[AsCommand(
+    name: 'test:configuration',
+    description: 'Check configuration path'
+)]
+class TestConfigurationCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->addArgument(
+            'config',
+            InputArgument::REQUIRED,
+            'YAML config'
+        );
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+
+        $configPath = $input->getArgument('config');
+
+        if (!file_exists($configPath)) {
+            $io->error(sprintf("Configuration file not found: %s", $configPath));
+            return Command::FAILURE;
+        }
+
+        try {
+            $config = new Configuration($configPath);
+            
+            $io->success("Configuration valid");
+            
+            $dbConfig = $config->getDatabaseConfig();
+            $io->note(sprintf("Configuration path: %s", $dbConfig['settings_file']));
+            $io->note(sprintf("Configuration name: %s", $dbConfig['connection_name']));
+            
+            $rules = $config->getRules();
+            if (!empty($rules)) {
+                $io->info(sprintf("Easy rules: %d", count($rules)));
+            }
+            
+            $groups = $config->getConsistencyGroups();
+            if (!empty($groups)) {
+                $io->info(sprintf("Consistency groupds: %d", count($groups)));
+            }
+            
+            return Command::SUCCESS;
+        } catch (\Exception $e) {
+            $io->error(sprintf("Configuration error: %s", $e->getMessage()));
+            
+            if ($output->isVerbose()) {
+                $io->comment("Trace:");
+                $io->text($e->getTraceAsString());
+            }
+            
+            return Command::FAILURE;
+        }
+    }
+}
