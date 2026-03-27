@@ -1,0 +1,47 @@
+# Composer
+vendor/
+composer.lock
+
+# PHAR
+dataveil.phar
+
+# Build artifacts
+*.tar.gz
+*.tar.bz2
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*\:Zone.Identifier
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+~$*.yaml
+
+# Testing
+.phpunit
+.dist/
+.coverage
+.nocoverage
+
+# PHPStan
+phpstan.neon
+phpstan.neon.dist
+
+# CodeSniffer
+.php_cs.cache
+.php-cs-fixer.cache
+
+# Coverage reports
+coverage/
