@@ -18,6 +18,7 @@ class StrategyManager
         $this->register(new FakeNameStrategy());
         $this->register(new FakeLastnameStrategy());
         $this->register(new StringRandomStrategy());
+        $this->register(new EmptyStringStrategy());
     }
 
     public function register(StrategyInterface $strategy): void
