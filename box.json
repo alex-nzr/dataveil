@@ -21,17 +21,15 @@
         }
     ],
     "banner": [
-          "This file is part of the dataveil project.",
-          "",
-          "(c) Andrei Nikolaev <gromdron@yandex.ru>",
-          "",
-          "This source file is subject to the MIT license that is bundled",
-          "with this source code in the file LICENSE."
+        "This file is part of the dataveil project.",
+        "",
+        "(c) Andrei Nikolaev <gromdron@yandex.ru>",
+        "",
+        "This source file is subject to the MIT license that is bundled",
+        "with this source code in the file LICENSE."
     ],
     "annotations": false,
-    "compactors": [
-        "KevinGH\\Box\\Compactor\\Php"
-    ],
+    "compactors": ["KevinGH\\Box\\Compactor\\Php"],
     "exclude-composer-files": false,
     "compression": "GZ",
     "check-requirements": false
