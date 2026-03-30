@@ -37,7 +37,10 @@ class Connection
             $this->connect();
         }
 
-        /** @phpstan-ignore-next-line */
+        if ($this->_mysqli === null) {
+            throw new ConnectionException('Connection was not initialized');
+        }
+
         return $this->_mysqli;
     }
 
@@ -68,7 +71,6 @@ class Connection
             throw new DatabaseException('Query failed: ' . $this->getConnection()->error);
         }
 
-        /** @phpstan-ignore-next-line */
         return $result;
     }
 
@@ -137,6 +139,11 @@ class Connection
     public function getTables(): array
     {
         $result = $this->query('SHOW TABLES');
+
+        if (!($result instanceof mysqli_result)) {
+            throw new DatabaseException('SHOW TABLES must return mysqli_result');
+        }
+
         $tables = [];
 
         while ($row = $result->fetch_row()) {
@@ -154,6 +161,11 @@ class Connection
     public function getTableColumns(string $table): array
     {
         $result = $this->query('DESCRIBE ' . $table);
+
+        if (!($result instanceof mysqli_result)) {
+            throw new DatabaseException('DESCRIBE query must return mysqli_result');
+        }
+
         $columns = [];
 
         while ($row = $result->fetch_assoc()) {

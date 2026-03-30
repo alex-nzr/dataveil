@@ -45,3 +45,10 @@ phpstan.neon.dist
 
 # Coverage reports
 coverage/
+
+# real config
+/configuration.yaml
+
+# Local workspace artifacts
+/.osp/
+/test-results
