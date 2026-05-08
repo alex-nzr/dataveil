@@ -26,8 +26,17 @@ class StrategyManager
         $this->strategies[] = $strategy;
     }
 
-    public function getStrategy(string $strategyName): ?StrategyInterface
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function getStrategy(string $strategyName, array $options = []): ?StrategyInterface
     {
+        $configuredStrategy = $this->createConfiguredStrategy($strategyName, $options);
+
+        if ($configuredStrategy !== null) {
+            return $configuredStrategy;
+        }
+
         foreach ($this->strategies as $strategy) {
             if ($strategy->supports($strategyName)) {
                 return $strategy;
@@ -37,14 +46,56 @@ class StrategyManager
         return null;
     }
 
-    public function generate(string $strategyName, mixed $originalValue, ?string $salt = null): string
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function generate(
+        string $strategyName,
+        mixed $originalValue,
+        ?string $salt = null,
+        array $options = []
+    ): string
     {
-        $strategy = $this->getStrategy($strategyName);
+        $strategy = $this->getStrategy($strategyName, $options);
 
         if ($strategy === null) {
             throw new \InvalidArgumentException("Unknown strategy: {$strategyName}");
         }
 
         return $strategy->generate($originalValue, $salt);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function createConfiguredStrategy(string $strategyName, array $options): ?StrategyInterface
+    {
+        if ($strategyName === 'string_random') {
+            return new StringRandomStrategy(
+                strategyName: $strategyName,
+                options: $this->normalizeStringRandomOptions($options),
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, string|int>
+     */
+    private function normalizeStringRandomOptions(array $options): array
+    {
+        $normalized = [];
+
+        if (isset($options['prefix'])) {
+            $normalized['prefix'] = (string) $options['prefix'];
+        }
+
+        if (isset($options['length'])) {
+            $normalized['length'] = (int) $options['length'];
+        }
+
+        return $normalized;
     }
 }

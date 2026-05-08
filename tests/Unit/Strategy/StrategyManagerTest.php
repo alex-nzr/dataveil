@@ -60,6 +60,18 @@ class StrategyManagerTest extends TestCase
         $this->assertEquals(12, strlen($result));
     }
 
+    public function testStringRandomOptionsAreAppliedWhenGenerating(): void
+    {
+        $result = $this->strategyManager->generate(
+            "string_random",
+            "123456",
+            options: ["prefix" => "user_", "length" => 10],
+        );
+
+        $this->assertStringStartsWith("user_", $result);
+        $this->assertEquals(15, strlen($result));
+    }
+
     public function testEmptyGeneration(): void
     {
         $empty = $this->strategyManager->generate("empty", "test");

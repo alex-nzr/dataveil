@@ -10,8 +10,6 @@ use DataVeil\Database\Connection;
 use DataVeil\Consistency\ConsistencyProcessor;
 use DataVeil\Serializer\SerializerHandler;
 use DataVeil\Strategy\StrategyManager;
-use DataVeil\Exception\AnonymizationException;
-use DataVeil\Strategy\StrategyInterface;
 use DataVeil\Exception\DataVeilException;
 
 class AnonymizerService
@@ -94,9 +92,7 @@ class AnonymizerService
             $saltSource = $field["salt_source"] ?? null;
 
             $strategyManager = new StrategyManager();
-            $strategyObj = $strategyManager->getStrategy($strategy);
-
-            if (!($strategyObj instanceof StrategyInterface)) {
+            if ($strategyManager->getStrategy($strategy, $options) === null) {
                 throw new DataVeilException("Strategry {$strategy} not found");
             }
 
@@ -122,9 +118,11 @@ class AnonymizerService
                     $salt = $originalValue;
                 }
 
-                $newValue = $strategyObj->generate(
+                $newValue = $strategyManager->generate(
+                    $strategy,
                     $originalValue,
                     is_null($salt) ? $salt : strval($salt),
+                    $options,
                 );
 
                 $updateStmt = $this->connection->prepare(
