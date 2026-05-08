@@ -20,7 +20,7 @@ class StrategyManager
         $this->register(new FakeMiddlenameStrategy());
         $this->register(new FakeCompanyStrategy());
         $this->register(new FakeJobTitleStrategy());
-        $this->register(new StringTruncateStrategy());
+        $this->register(new StringTruncateStrategy('string_truncate_4'));
         $this->register(new StringInitialStrategy());
         $this->register(new NumberFakeStrategy());
         $this->register(new NumberFakeStrategy('amount_fake', ['decimals' => 2, 'min' => 1000, 'max' => 100000]));
@@ -82,6 +82,10 @@ class StrategyManager
                 strategyName: $strategyName,
                 options: $this->normalizeStringRandomOptions($options),
             );
+        }
+
+        if (preg_match('/^string_truncate_\d+$/', $strategyName) === 1) {
+            return new StringTruncateStrategy($strategyName);
         }
 
         if ($strategyName === 'number_fake' || $strategyName === 'amount_fake') {

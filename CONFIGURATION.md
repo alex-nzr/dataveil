@@ -484,13 +484,15 @@ fields:
 
 ### Строковые стратегии сохранения части значения
 
-`string_truncate_4` оставляет первые 4 символа исходной строки. Например, `Иванов` станет `Иван`.
+`string_truncate_N` оставляет первые `N` символов исходной строки. Например, `Иванов` при стратегии `string_truncate_4` станет `Иван`.
 
 ```yaml
 fields:
     - column: "LAST_NAME"
       strategy: "string_truncate_4"
 ```
+
+Длина задаётся в имени стратегии, без `options`: `string_truncate_2`, `string_truncate_4`, `string_truncate_8`.
 
 `string_initial` оставляет первую букву и добавляет точку. Например, `Иван` станет `И.`.
 

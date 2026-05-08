@@ -75,6 +75,13 @@ class StrategyManagerTest extends TestCase
         $this->assertSame("Иван", $result);
     }
 
+    public function testStringTruncateStrategyUsesLengthFromName(): void
+    {
+        $result = $this->strategyManager->generate("string_truncate_2", "Иванов");
+
+        $this->assertSame("Ив", $result);
+    }
+
     public function testStringInitialStrategy(): void
     {
         $result = $this->strategyManager->generate("string_initial", "Иван");
