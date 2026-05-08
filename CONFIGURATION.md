@@ -132,6 +132,44 @@ serialization:
 
 Такой вариант используется для синхронизации телефонов и email из `b_crm_field_multi` со связанными serialized-данными активности.
 
+## Смарт-процессы Bitrix24
+
+Смарт-процессы в Bitrix24 хранятся в таблицах вида `b_crm_dynamic_items_*`. Их набор и пользовательские поля отличаются от портала к порталу, поэтому на текущем этапе они описываются вручную в рабочем `configuration.yaml`.
+
+Минимальный подход:
+- добавить правило `update` для нужной таблицы `b_crm_dynamic_items_*`;
+- анонимизировать стандартные поля `TITLE`, `XML_ID`, `SOURCE_DESCRIPTION`, `COMMENTS`, если они есть;
+- анонимизировать денежные поля `OPPORTUNITY`, `TAX_VALUE`, `OPPORTUNITY_ACCOUNT`, `TAX_VALUE_ACCOUNT` через `amount_fake`;
+- очищать чувствительные текстовые `UF_*` поля через `empty` или заменять суммы через `amount_fake`;
+- добавить `truncate` для связанной index-таблицы `b_crm_dynamic_items_*_index`.
+
+Пример:
+
+```yaml
+rules:
+    tables:
+        - name: "b_crm_dynamic_items_164"
+          action: "update"
+          fields:
+              - column: "TITLE"
+                strategy: "string_random"
+                options: { length: 12, prefix: "smart_" }
+                salt_source: "id"
+              - column: "XML_ID"
+                strategy: "empty"
+              - column: "OPPORTUNITY"
+                strategy: "amount_fake"
+                options: { min: 1000, max: 1000000, decimals: 2, preserve_sign: true }
+                salt_source: "id"
+              - column: "UF_CRM_11_SHIPMENT_ADRESS"
+                strategy: "empty"
+
+        - name: "b_crm_dynamic_items_164_index"
+          action: "truncate"
+```
+
+Перед реальным запуском обязательно выполните `anonymize --dry-run`: он проверит существование таблиц, колонок и стратегий и покажет количество строк.
+
 ### Типовые сценарии
 
 #### Сценарий 1: Простой якорь → цель
