@@ -61,7 +61,7 @@ class Connection
     }
 
     /**
-     * @throws     \DataVeil\Exception\DatabaseException
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function query(string $sql): mysqli_result|bool
     {
@@ -75,7 +75,8 @@ class Connection
     }
 
     /**
-     * @throws     \DataVeil\Exception\DatabaseException
+     * @throws \DataVeil\Exception\ConnectionException
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function prepare(string $sql): mysqli_stmt
     {
@@ -89,7 +90,8 @@ class Connection
     }
 
     /**
-     * @throws     \DataVeil\Exception\DatabaseException
+     * @throws \DataVeil\Exception\ConnectionException
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function beginTransaction(): void
     {
@@ -99,7 +101,8 @@ class Connection
     }
 
     /**
-     * @throws     \DataVeil\Exception\DatabaseException
+     * @throws \DataVeil\Exception\ConnectionException
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function commit(): void
     {
@@ -109,17 +112,21 @@ class Connection
     }
 
     /**
-     * @throws     \DataVeil\Exception\DatabaseException
+     * @throws \DataVeil\Exception\ConnectionException
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function rollback(): void
     {
-        if (!$this->getConnection()->rollback()) {
+        if (!$this->getConnection()->rollback())
+        {
             throw new DatabaseException('Failed to rollback transaction');
         }
     }
 
     /**
-     * @throws     \DataVeil\Exception\DatabaseException
+     * @throws \DataVeil\Exception\ConnectionException
+     * @throws \DataVeil\Exception\DatabaseException
+     * @throws \Throwable
      */
     public function executeInTransaction(callable $callback): void
     {
@@ -134,7 +141,8 @@ class Connection
     }
 
     /**
-     * @return     array<string>
+     * @return array<string>
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function getTables(): array
     {
@@ -156,7 +164,8 @@ class Connection
     }
 
     /**
-     * @return     array<mixed>
+     * @return array<int, array<string, mixed>>
+     * @throws \DataVeil\Exception\DatabaseException
      */
     public function getTableColumns(string $table): array
     {
@@ -177,16 +186,25 @@ class Connection
         return $columns;
     }
 
+    /**
+     * @throws \DataVeil\Exception\ConnectionException
+     */
     public function escape(string $value): string
     {
         return $this->getConnection()->real_escape_string($value);
     }
 
+    /**
+     * @throws \DataVeil\Exception\ConnectionException
+     */
     public function getInsertId(): int
     {
         return (int) $this->getConnection()->insert_id;
     }
 
+    /**
+     * @throws \DataVeil\Exception\ConnectionException
+     */
     public function affectedRows(): int
     {
         return (int) $this->getConnection()->affected_rows;
