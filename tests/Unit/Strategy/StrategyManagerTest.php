@@ -68,6 +68,20 @@ class StrategyManagerTest extends TestCase
         $this->assertStringNotContainsString("post_", $jobTitle);
     }
 
+    public function testStringTruncateStrategy(): void
+    {
+        $result = $this->strategyManager->generate("string_truncate_4", "Иванов");
+
+        $this->assertSame("Иван", $result);
+    }
+
+    public function testStringInitialStrategy(): void
+    {
+        $result = $this->strategyManager->generate("string_initial", "Иван");
+
+        $this->assertSame("И.", $result);
+    }
+
     public function testStringRandomStrategy(): void
     {
         $strategy = new StringRandomStrategy(

@@ -20,6 +20,8 @@ class StrategyManager
         $this->register(new FakeMiddlenameStrategy());
         $this->register(new FakeCompanyStrategy());
         $this->register(new FakeJobTitleStrategy());
+        $this->register(new StringTruncateStrategy());
+        $this->register(new StringInitialStrategy());
         $this->register(new NumberFakeStrategy());
         $this->register(new NumberFakeStrategy('amount_fake', ['decimals' => 2, 'min' => 1000, 'max' => 100000]));
         $this->register(new StringRandomStrategy());
