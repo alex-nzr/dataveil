@@ -43,12 +43,17 @@ class BackupAnonymizationService
         $this->guard->assertSafe($tempDatabase, $connectionParams['database']);
 
         $workDirectory = $this->createWorkDirectory();
+        $mysqlParams = [
+            'host' => $connectionParams['host'],
+            'login' => $connectionParams['login'],
+            'password' => $connectionParams['password'],
+        ];
+        if (isset($connectionParams['port'])) {
+            $mysqlParams['port'] = $connectionParams['port'];
+        }
+
         $mysql = new MysqlClient(
-            [
-                'host' => $connectionParams['host'],
-                'login' => $connectionParams['login'],
-                'password' => $connectionParams['password'],
-            ],
+            $mysqlParams,
             $options['mysql_bin'],
             $options['mysqldump_bin'],
         );
@@ -99,7 +104,7 @@ class BackupAnonymizationService
     }
 
     /**
-     * @param array{host: string, database: string, login: string, password: string} $connectionParams
+     * @param array{host: string, database: string, login: string, password: string, port?: string} $connectionParams
      */
     private function createRuntimeConfig(Configuration $config, array $connectionParams, string $tempDatabase): Configuration
     {
@@ -113,6 +118,10 @@ class BackupAnonymizationService
                 'password' => $connectionParams['password'],
             ],
         ];
+
+        if (isset($connectionParams['port'])) {
+            $runtimeConfig['database']['mysql']['port'] = $connectionParams['port'];
+        }
 
         return Configuration::fromArray($runtimeConfig, 'backup-runtime');
     }

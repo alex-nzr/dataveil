@@ -9,24 +9,19 @@ use DataVeil\Exception\DataVeilException;
 class MysqlClient
 {
     /**
-     * @param array{host: string, login: string, password: string} $params
+     * @param array{host: string, login: string, password: string, port?: string} $params
      */
     public function __construct(
         private readonly array $params,
         string $mysqlBinary = 'mysql',
         string $mysqldumpBinary = 'mysqldump',
     ) {
-        $this->openServerSettings = $this->resolveOpenServerSettings((string) $params['host']);
         $this->mysqlBinary = $this->resolveBinary($mysqlBinary);
         $this->mysqldumpBinary = $this->resolveBinary($mysqldumpBinary);
     }
 
     private string $mysqlBinary;
     private string $mysqldumpBinary;
-    /**
-     * @var array{host: string, port: string, socket: string}|null
-     */
-    private ?array $openServerSettings = null;
 
     public function createDatabase(string $database): void
     {
@@ -81,16 +76,12 @@ class MysqlClient
             $binary,
             '--user=' . $this->params['login'],
             '--default-character-set=utf8mb4',
+            '--host=' . $this->params['host'],
+            '--protocol=TCP',
         ];
 
-        if ($this->openServerSettings !== null) {
-            $command[] = '--protocol=PIPE';
-            $command[] = '--socket=' . $this->openServerSettings['socket'];
-            $command[] = '--host=';
-        } else {
-            $command[] = '--host=' . $this->params['host'];
-            $command[] = '--port=3306';
-            $command[] = '--protocol=TCP';
+        if (isset($this->params['port'])) {
+            $command[] = '--port=' . $this->params['port'];
         }
 
         if ($database !== null) {
@@ -110,42 +101,7 @@ class MysqlClient
             return $binary;
         }
 
-        $module = (string) $this->params['host'];
-        $moduleBinary = 'D:/OpenServer/modules/' . $module . '/bin/' . $binary . '.exe';
-        if (is_file($moduleBinary)) {
-            return $moduleBinary;
-        }
-
-        $openServerMatches = glob('D:/OpenServer/modules/*/bin/' . $binary . '.exe');
-        if (is_array($openServerMatches) && $openServerMatches !== []) {
-            rsort($openServerMatches, SORT_NATURAL);
-
-            return $openServerMatches[0];
-        }
-
         return $binary;
-    }
-
-    /**
-     * @return array{host: string, port: string, socket: string}|null
-     */
-    private function resolveOpenServerSettings(string $moduleName): ?array
-    {
-        $settingsPath = 'D:/OpenServer/config/' . $moduleName . '/default/settings.ini';
-        if (!is_file($settingsPath)) {
-            return null;
-        }
-
-        $settings = parse_ini_file($settingsPath, false, INI_SCANNER_RAW);
-        if (!is_array($settings)) {
-            return null;
-        }
-
-        return [
-            'host' => (string) ($settings['ip'] ?? '127.0.0.1'),
-            'port' => (string) ($settings['port'] ?? '3306'),
-            'socket' => $moduleName,
-        ];
     }
 
     /**

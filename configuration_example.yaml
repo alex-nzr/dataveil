@@ -1,108 +1,290 @@
 version: 1.0
 
+# Основной вариант для установленного Bitrix24:
+# DataVeil прочитает параметры подключения из bitrix/.settings.php.
 database:
     source: "bitrix_settings"
     bitrix:
-        settings_file: "/home/bitrix/www/bitrix/.settings.php"
+        settings_file: "/path/to/bitrix/.settings.php"
         connection_name: "default"
 
-# Для прямого подключения к MySQL/MariaDB вместо bitrix/.settings.php:
+# Альтернативный вариант для прямого подключения к MySQL/MariaDB.
+# Оставьте активным только один database-блок: либо bitrix_settings, либо mysql.
 #
 # database:
 #     source: "mysql"
 #     mysql:
-#         host: "localhost"
+#         host: "127.0.0.1"
+#         port: 3306
 #         database: "dataveil_tmp_backup"
-#         login: "root"
-#         password: ""
+#         login: "db_user"
+#         password: "db_password"
 
 rules:
-    # ... (обычные правила для таблиц, которые не требуют синхронизации) ...
     tables:
         - name: "b_search_content"
           action: "truncate"
-          comment: "Индекс поиска, безопасно удалять, перестроится"
+          comment: "Поисковый индекс; после восстановления может быть перестроен Bitrix"
 
         - name: "b_user"
           action: "update"
           fields:
               - column: "EMAIL"
-                strategy: "email_fake" # Генерация вида user_{id}@fake.local
+                strategy: "email_fake"
+                salt_source: "id"
               - column: "LOGIN"
                 strategy: "string_random"
                 options: { length: 10, prefix: "user_" }
+                salt_source: "id"
               - column: "NAME"
                 strategy: "name_fake"
+                salt_source: "id"
+              - column: "SECOND_NAME"
+                strategy: "middlename_fake"
+                salt_source: "id"
               - column: "LAST_NAME"
                 strategy: "lastname_fake"
+                salt_source: "id"
               - column: "PERSONAL_PHONE"
                 strategy: "phone_fake"
-          # Исключения (какие записи не трогать)
+                salt_source: "id"
+              - column: "WORK_PHONE"
+                strategy: "phone_fake"
+                salt_source: "id"
+              - column: "WORK_COMPANY"
+                strategy: "company_fake"
+                salt_source: "id"
           where: "ID NOT IN (1)"
+
+        - name: "b_crm_lead"
+          action: "update"
+          fields:
+              - column: "TITLE"
+                strategy: "string_random"
+                options: { length: 12, prefix: "lead_" }
+                salt_source: "id"
+              - column: "NAME"
+                strategy: "name_fake"
+                salt_source: "id"
+              - column: "SECOND_NAME"
+                strategy: "middlename_fake"
+                salt_source: "id"
+              - column: "LAST_NAME"
+                strategy: "lastname_fake"
+                salt_source: "id"
+              - column: "COMPANY_TITLE"
+                strategy: "company_fake"
+                salt_source: "id"
+              - column: "POST"
+                strategy: "job_title_fake"
+                salt_source: "id"
+              - column: "ADDRESS"
+                strategy: "empty"
+              - column: "COMMENTS"
+                strategy: "empty"
+              - column: "SOURCE_DESCRIPTION"
+                strategy: "empty"
+              - column: "OPPORTUNITY"
+                strategy: "amount_fake"
+                options: { min: 1000, max: 1000000, decimals: 2, preserve_sign: true }
+                salt_source: "id"
+              - column: "SEARCH_CONTENT"
+                strategy: "empty"
+
+        - name: "b_crm_contact"
+          action: "update"
+          fields:
+              - column: "NAME"
+                strategy: "name_fake"
+                salt_source: "id"
+              - column: "SECOND_NAME"
+                strategy: "middlename_fake"
+                salt_source: "id"
+              - column: "LAST_NAME"
+                strategy: "lastname_fake"
+                salt_source: "id"
+              - column: "POST"
+                strategy: "job_title_fake"
+                salt_source: "id"
+              - column: "ADDRESS"
+                strategy: "empty"
+              - column: "COMMENTS"
+                strategy: "empty"
+              - column: "SOURCE_DESCRIPTION"
+                strategy: "empty"
+              - column: "SEARCH_CONTENT"
+                strategy: "empty"
+
+        - name: "b_crm_company"
+          action: "update"
+          fields:
+              - column: "TITLE"
+                strategy: "company_fake"
+                salt_source: "id"
+              - column: "ADDRESS"
+                strategy: "empty"
+              - column: "COMMENTS"
+                strategy: "empty"
+              - column: "BANKING_DETAILS"
+                strategy: "empty"
+              - column: "SOURCE_DESCRIPTION"
+                strategy: "empty"
+              - column: "SEARCH_CONTENT"
+                strategy: "empty"
+
+        - name: "b_crm_deal"
+          action: "update"
+          fields:
+              - column: "TITLE"
+                strategy: "string_random"
+                options: { length: 12, prefix: "deal_" }
+                salt_source: "id"
+              - column: "COMMENTS"
+                strategy: "empty"
+              - column: "ADDITIONAL_INFO"
+                strategy: "empty"
+              - column: "OPPORTUNITY"
+                strategy: "amount_fake"
+                options: { min: 1000, max: 1000000, decimals: 2, preserve_sign: true }
+                salt_source: "id"
+              - column: "SEARCH_CONTENT"
+                strategy: "empty"
+
+        - name: "b_crm_requisite"
+          action: "update"
+          fields:
+              - column: "NAME"
+                strategy: "company_fake"
+                salt_source: "id"
+              - column: "RQ_FIRST_NAME"
+                strategy: "name_fake"
+                salt_source: "id"
+              - column: "RQ_LAST_NAME"
+                strategy: "lastname_fake"
+                salt_source: "id"
+              - column: "RQ_SECOND_NAME"
+                strategy: "middlename_fake"
+                salt_source: "id"
+              - column: "RQ_COMPANY_NAME"
+                strategy: "company_fake"
+                salt_source: "id"
+              - column: "RQ_EMAIL"
+                strategy: "email_fake"
+                salt_source: "id"
+              - column: "RQ_PHONE"
+                strategy: "phone_fake"
+                salt_source: "id"
+              - column: "RQ_INN"
+                strategy: "empty"
+              - column: "RQ_KPP"
+                strategy: "empty"
+              - column: "RQ_OGRN"
+                strategy: "empty"
+
+        - name: "b_crm_bank_detail"
+          action: "update"
+          fields:
+              - column: "RQ_BANK_NAME"
+                strategy: "empty"
+              - column: "RQ_BANK_ADDR"
+                strategy: "empty"
+              - column: "RQ_BIK"
+                strategy: "empty"
+              - column: "RQ_ACC_NUM"
+                strategy: "empty"
+              - column: "RQ_COR_ACC_NUM"
+                strategy: "empty"
+              - column: "RQ_IBAN"
+                strategy: "empty"
+              - column: "RQ_SWIFT"
+                strategy: "empty"
+              - column: "COMMENTS"
+                strategy: "empty"
+
+        - name: "b_crm_addr"
+          action: "update"
+          fields:
+              - column: "ADDRESS_1"
+                strategy: "empty"
+              - column: "ADDRESS_2"
+                strategy: "empty"
+              - column: "CITY"
+                strategy: "empty"
+              - column: "POSTAL_CODE"
+                strategy: "empty"
+              - column: "REGION"
+                strategy: "empty"
+              - column: "PROVINCE"
+                strategy: "empty"
+              - column: "COUNTRY"
+                strategy: "empty"
+              - column: "COUNTRY_CODE"
+                strategy: "empty"
+
+        # Пример смарт-процесса. Номер таблицы и UF-поля нужно заменить под конкретный портал.
+        - name: "b_crm_dynamic_items_1000"
+          action: "update"
+          fields:
+              - column: "TITLE"
+                strategy: "string_random"
+                options: { length: 12, prefix: "smart_" }
+                salt_source: "id"
+              - column: "COMMENTS"
+                strategy: "empty"
+              - column: "OPPORTUNITY"
+                strategy: "amount_fake"
+                options: { min: 1000, max: 1000000, decimals: 2, preserve_sign: true }
+                salt_source: "id"
+              - column: "UF_EXAMPLE_TEXT"
+                strategy: "empty"
+
+        - name: "b_crm_dynamic_items_1000_index"
+          action: "truncate"
+
+        - name: "b_crm_lead_index"
+          action: "truncate"
+        - name: "b_crm_contact_index"
+          action: "truncate"
+        - name: "b_crm_company_index"
+          action: "truncate"
+        - name: "b_crm_deal_index"
+          action: "truncate"
+
 consistency_groups:
-    # Группа: Телефоны (Гранулярность по записи в мультиполях)
     - id: "crm_phone_unique"
-      comment: "Каждый телефон в мультиполях получает уникальный фейк. История звонков сопоставляется по значению."
-
-      # 1. Источник (Якорь) - теперь это конкретная запись телефона, а не просто Контакт
-      anchor:
-          table: "b_crm_field_multi"
-          id_column: "ID" # Уникальность по ID строки
-          # Нам нужно знать, к какому контакту относится телефон, для связи с историей
-          context_columns: # Подгружаем эти поля для использования в логике
-              - "ENTITY_ID" # ID Контакта
-              - "VALUE" # Оригинальный номер (нужен для поиска в истории)
-              - "TYPE_ID" # Тип (PHONE)
-          filters:
-              - column: "TYPE_ID"
-                value: "PHONE"
-
-      # 2. Генератор
-      generator:
-          # deterministic: true гарантирует, что для строки ID=55 всегда будет один и тот же фейк
-          # даже если скрипт запущен дважды. Это важно для консистентности.
-          deterministic: true
-          strategy: "phone_fake"
-          # Соль может включать ID строки, чтобы номера не повторялись
-          salt_source: "row_id"
-
-      # 3. Цели (Куда записать сгенерированное значение)
-      targets:
-          # 3.1. Обновляем саму таблицу мультиполей (источник истины)
-          - table: "b_crm_field_multi"
-            column: "VALUE"
-            # Так как таблица совпадает с anchor, просто обновляем по ID
-            join:
-                key_column: "ID"
-                ref_column: "ID"
-
-          # 3.2. Обновляем историю коммуникаций (b_crm_act_comm)
-          - table: "b_crm_act_comm"
-            column: "ENTITY_SETTINGS"
-            # Сложная связь: мы не можем джойнить по ID.
-            # Мы должны найти в истории записи, где в настройках был ЭТОТ конкретный номер.
-            join:
-                type: "serialized_value_match" # Специальный тип джойна для скрипта
-                entity_id_column: "OWNER_ID" # Сначала фильтруем по владельцу (Контакту)
-                ref_entity_column: "ENTITY_ID" # Из anchor.context_columns
-                filters:
-                    - column: "OWNER_TYPE_ID"
-                      value: "3" # Contact
-            serialization:
-                type: "php_serialize"
-                # Ищем в сериализованном массиве ключ PHONE, значение которого совпадает с anchor.VALUE
-                match_key: "PHONE"
-                match_value_source: "anchor.VALUE" # Сравниваем со старым номером из якоря
-                replace: true # Если нашли совпадение - заменяем на новое значение из генератора
-
-    # Группа: Email (Аналогично, но проще, так как email обычно уникален)
-    - id: "crm_email_unique"
+      comment: "Телефоны CRM заменяются согласованно в мультиполях и связанных serialized-данных активностей"
       anchor:
           table: "b_crm_field_multi"
           id_column: "ID"
-          context_columns:
-              - "ENTITY_ID"
-              - "VALUE"
+          context_columns: ["ENTITY_ID", "VALUE", "TYPE_ID"]
+          filters:
+              - column: "TYPE_ID"
+                value: "PHONE"
+      generator:
+          deterministic: true
+          strategy: "phone_fake"
+          salt_source: "row_id"
+      targets:
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            join: { key_column: "ID", ref_column: "ID" }
+          - table: "b_crm_act_comm"
+            column: "ENTITY_SETTINGS"
+            join:
+                type: "serialized_value_match"
+                entity_id_column: "OWNER_ID"
+                ref_entity_column: "ENTITY_ID"
+            serialization:
+                type: "php_serialize"
+                match_key: "PHONE"
+                match_value_source: "anchor.VALUE"
+
+    - id: "crm_email_unique"
+      comment: "Email CRM заменяются согласованно в мультиполях и связанных serialized-данных активностей"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+          context_columns: ["ENTITY_ID", "VALUE", "TYPE_ID"]
           filters:
               - column: "TYPE_ID"
                 value: "EMAIL"
@@ -120,11 +302,7 @@ consistency_groups:
                 type: "serialized_value_match"
                 entity_id_column: "OWNER_ID"
                 ref_entity_column: "ENTITY_ID"
-                filters:
-                    - column: "OWNER_TYPE_ID"
-                      value: "3"
             serialization:
                 type: "php_serialize"
                 match_key: "EMAIL"
                 match_value_source: "anchor.VALUE"
-                replace: true

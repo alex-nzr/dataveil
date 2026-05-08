@@ -119,6 +119,10 @@ class Configuration
                     ? (string) $mysqlConfig['password']
                     : '',
             ];
+
+            if (isset($mysqlConfig['port']) && is_scalar($mysqlConfig['port'])) {
+                $this->mysqlConfig['port'] = (string) $mysqlConfig['port'];
+            }
         }
 
         if (isset($this->config['consistency_groups']) && \is_array($this->config['consistency_groups'])) {

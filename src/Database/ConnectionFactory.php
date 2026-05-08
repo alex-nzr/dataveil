@@ -22,19 +22,25 @@ class ConnectionFactory
     }
 
     /**
-     * @return array{host: string, database: string, login: string, password: string}
+     * @return array{host: string, database: string, login: string, password: string, port?: string}
      */
     public function resolveParams(Configuration $config): array
     {
         $dbConfig = $config->getDatabaseConfig();
 
         if (($dbConfig['source'] ?? '') === 'mysql') {
-            return [
+            $params = [
                 'host' => (string) $dbConfig['host'],
                 'database' => (string) $dbConfig['database'],
                 'login' => (string) $dbConfig['login'],
                 'password' => (string) ($dbConfig['password'] ?? ''),
             ];
+
+            if (isset($dbConfig['port'])) {
+                $params['port'] = (string) $dbConfig['port'];
+            }
+
+            return $params;
         }
 
         $parser = new BitrixSettingsParser(
