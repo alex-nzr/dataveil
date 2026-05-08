@@ -51,4 +51,27 @@ class ConfigurationTest extends TestCase
         $this->assertIsArray($rules);
     }
 
+    public function testLoadMysqlConfiguration(): void
+    {
+        $config = Configuration::fromArray([
+            'database' => [
+                'source' => 'mysql',
+                'mysql' => [
+                    'host' => 'localhost',
+                    'database' => 'dataveil_tmp_test',
+                    'login' => 'root',
+                    'password' => '',
+                ],
+            ],
+            'rules' => [
+                'tables' => [],
+            ],
+        ]);
+
+        $dbConfig = $config->getDatabaseConfig();
+
+        $this->assertSame('mysql', $dbConfig['source']);
+        $this->assertSame('dataveil_tmp_test', $dbConfig['database']);
+    }
+
 }

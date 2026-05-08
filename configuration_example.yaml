@@ -6,6 +6,16 @@ database:
         settings_file: "/home/bitrix/www/bitrix/.settings.php"
         connection_name: "default"
 
+# Для прямого подключения к MySQL/MariaDB вместо bitrix/.settings.php:
+#
+# database:
+#     source: "mysql"
+#     mysql:
+#         host: "localhost"
+#         database: "dataveil_tmp_backup"
+#         login: "root"
+#         password: ""
+
 rules:
     # ... (обычные правила для таблиц, которые не требуют синхронизации) ...
     tables:

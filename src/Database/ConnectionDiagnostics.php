@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace DataVeil\Database;
 
-use DataVeil\Config\BitrixSettingsParser;
 use DataVeil\Config\Configuration;
 use DataVeil\Exception\DatabaseException;
 
@@ -15,19 +14,9 @@ class ConnectionDiagnostics
      */
     public function test(Configuration $config): array
     {
-        $dbConfig = $config->getDatabaseConfig();
-        $parser = new BitrixSettingsParser(
-            $dbConfig['settings_file'],
-            $dbConfig['connection_name'],
-        );
-
-        $connectionParams = $parser->parse();
-        $connection = new Connection(
-            $connectionParams['host'],
-            $connectionParams['database'],
-            $connectionParams['login'],
-            $connectionParams['password'],
-        );
+        $factory = new ConnectionFactory();
+        $connectionParams = $factory->resolveParams($config);
+        $connection = $factory->create($config);
 
         $connection->query('SELECT 1');
         $result = $connection->query(

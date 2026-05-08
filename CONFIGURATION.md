@@ -13,8 +13,13 @@
 ## Раздел database
 
 Содержит информацию для подключения к базе данных.
-В текущей версии в качестве источника поддерживается только `bitrix_settings`.
-Он описывается параметрами:
+Поддерживаются два источника:
+- `bitrix_settings` - чтение параметров подключения из `bitrix/.settings.php`;
+- `mysql` - прямое указание параметров MySQL/MariaDB, используется в том числе для runtime-конфига временной БД при обработке бэкапа.
+
+### Источник bitrix_settings
+
+Описывается параметрами:
 - `settings_file` - путь к файлу конфигурации битрикса 
 - `connection_name` - имя соединения с базой данных
 
@@ -25,6 +30,26 @@ database:
         settings_file: "/home/bitrix/www/bitrix/.settings.php"
         connection_name: "default"
 ```
+
+### Источник mysql
+
+Описывается параметрами:
+- `host` - host MySQL/MariaDB;
+- `database` - имя базы данных;
+- `login` - пользователь;
+- `password` - пароль, может быть пустой строкой.
+
+```yaml
+database:
+    source: "mysql"
+    mysql:
+        host: "localhost"
+        database: "dataveil_tmp_backup"
+        login: "root"
+        password: ""
+```
+
+Этот источник нужен, когда DataVeil должен работать с уже подготовленной БД напрямую, без доступа к файлам Bitrix24. Backup-режим создаёт такой runtime-конфиг автоматически для временной БД.
 
 ## Раздел rules
 

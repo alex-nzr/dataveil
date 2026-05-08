@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace DataVeil\Anonymizer;
 
-use DataVeil\Config\BitrixSettingsParser;
 use DataVeil\Config\Configuration;
 use DataVeil\Database\Connection;
+use DataVeil\Database\ConnectionFactory;
 use DataVeil\Exception\DataVeilException;
 use DataVeil\Strategy\StrategyManager;
 use mysqli_result;
@@ -64,19 +64,7 @@ class AnonymizationPreflight
 
     protected function createConnection(Configuration $config): Connection
     {
-        $dbConfig = $config->getDatabaseConfig();
-        $parser = new BitrixSettingsParser(
-            $dbConfig['settings_file'],
-            $dbConfig['connection_name'],
-        );
-        $connectionParams = $parser->parse();
-
-        return new Connection(
-            $connectionParams['host'],
-            $connectionParams['database'],
-            $connectionParams['login'],
-            $connectionParams['password'],
-        );
+        return (new ConnectionFactory())->create($config);
     }
 
     /**

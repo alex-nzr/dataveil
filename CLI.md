@@ -1,12 +1,12 @@
-# CLI commands
+# CLI-команды
 
-DataVeil is distributed as a console application. In a prepared environment the commands are usually executed through the PHAR file:
+DataVeil поставляется как консольное приложение. В готовой среде команды обычно запускаются через PHAR:
 
 ```bash
 php dataveil.phar <command> [arguments] [options]
 ```
 
-During development the same commands can be executed through the project entrypoint:
+Во время разработки те же команды можно запускать через входной файл проекта:
 
 ```bash
 php DataVeil.php <command> [arguments] [options]
@@ -14,100 +14,126 @@ php DataVeil.php <command> [arguments] [options]
 
 ## list
 
-Shows all available commands.
+Показывает список доступных команд.
 
 ```bash
 php dataveil.phar list
 ```
 
-Use this command to verify that the application starts correctly and to see which commands are available in the current build.
+Команда нужна, чтобы проверить, что приложение запускается, и посмотреть, какие команды есть в текущей сборке.
 
 ## help
 
-Shows detailed help for a command.
+Показывает справку по конкретной команде.
 
 ```bash
 php dataveil.phar help anonymize
 php dataveil.phar help test:configuration
 php dataveil.phar help test:db-connection
+php dataveil.phar help backup:anonymize
 ```
 
-Use this command when you need to check required arguments, supported options, and command descriptions.
+Используйте эту команду, когда нужно проверить обязательные аргументы, доступные опции и назначение команды.
 
 ## test:configuration
 
-Validates the YAML configuration file and prints the resolved database settings source and basic rule counts.
+Проверяет YAML-конфигурацию и выводит базовую информацию о настройках.
 
 ```bash
 php dataveil.phar test:configuration configuration.yaml
 ```
 
-This command is needed before running anonymization. It checks that the configuration file can be read and that required sections are present.
+Команда нужна перед запуском анонимизации. Она проверяет, что конфигурационный файл читается и содержит обязательные разделы.
 
 ## test:db-connection
 
-Checks database connectivity using the database settings described in the YAML configuration.
+Проверяет подключение к базе данных по настройкам из YAML-конфигурации.
 
 ```bash
 php dataveil.phar test:db-connection configuration.yaml
 ```
 
-The command reads Bitrix database connection parameters from the configured `.settings.php`, opens a database connection, executes diagnostic SELECT queries, and prints connection details such as selected database, server version, server host, and charset.
+Команда читает параметры подключения, открывает соединение с базой, выполняет диагностические SELECT-запросы и выводит выбранную БД, версию сервера, host сервера и кодировку.
 
-Use this command after `test:configuration` and before anonymization to confirm that DataVeil will connect to the expected database.
+Используйте её после `test:configuration` и перед анонимизацией, чтобы убедиться, что DataVeil подключится к ожидаемой базе.
 
 ## anonymize
 
-Runs database anonymization according to the YAML configuration.
+Запускает анонимизацию базы данных по YAML-конфигурации.
 
 ```bash
 php dataveil.phar anonymize configuration.yaml
 ```
 
-The command reads anonymization rules, connects to the configured database, and applies configured table actions and field strategies. It should be executed only on a copied or test Bitrix24 database, not on production data.
+Команда читает правила анонимизации, подключается к настроенной базе и применяет действия к таблицам и полям. Её нужно запускать только на копии или тестовой базе Bitrix24, а не на production-данных.
 
 ## anonymize --dry-run
 
-Runs a preflight check without applying changes.
+Запускает предварительную проверку без изменения данных.
 
 ```bash
 php dataveil.phar anonymize configuration.yaml --dry-run
 ```
 
-The command connects to the configured database and uses metadata and SELECT queries to verify that configured tables, columns, strategies, and consistency groups can be processed. It prints the rules, consistency groups, and row counts that would be affected.
+Команда подключается к базе и проверяет через metadata/SELECT-запросы, что настроенные таблицы, колонки, стратегии и consistency groups могут быть обработаны. В отчёте выводятся правила, группы согласованности и количество строк, которые были бы затронуты.
 
-Use this command after `test:db-connection` and before the real anonymization command.
+Используйте `--dry-run` после `test:db-connection` и перед реальной анонимизацией.
 
 ## backup:anonymize
 
-Planned command for anonymizing an existing Bitrix24 SQL backup without connecting to the live Bitrix24 database.
+Анонимизирует существующий SQL-бэкап Bitrix24 без подключения к живой базе портала.
 
 ```bash
 php dataveil.phar backup:anonymize configuration.yaml \
-    --input backup.sql \
-    --output backup.anonymized.sql \
+    --input backup.tar.gz \
     --temp-db dataveil_tmp_backup
 ```
 
-The command is intended for the workflow where a client creates a database backup on their side, sends the backup for processing, and DataVeil produces a new anonymized SQL dump. The original live database is not modified.
+Команда предназначена для сценария, где клиент сам создаёт бэкап БД Bitrix24, передаёт архив или SQL-дамп, а DataVeil создаёт новый обезличенный дамп. Исходная живая база Bitrix24 не изменяется.
 
-### Temporary database workflow
+Поддерживаемые входные форматы текущего этапа:
 
-The temporary database is a separate technical MySQL/MariaDB database created only for processing one backup.
+- `.sql` - обычный SQL-дамп;
+- `.tar.gz` - архив БД, созданный штатным механизмом резервного копирования Bitrix.
 
-The command workflow:
+Для Bitrix-архива команда ожидает пару файлов:
 
-1. Read anonymization rules from `configuration.yaml`.
-2. Validate the input dump path, output dump path, and temporary database name.
-3. Connect to the configured MySQL/MariaDB server with a technical user.
-4. Create the temporary database named by `--temp-db`.
-5. Import the SQL dump from `--input` into that temporary database.
-6. Run anonymization preflight checks against the imported database.
-7. If preflight passes and `--dry-run` is not enabled, run anonymization against the temporary database.
-8. Export the anonymized temporary database to `--output`.
-9. Drop the temporary database and remove temporary files, unless `--keep-temp` is enabled.
+- основной файл дампа, например `b24.test_20260508_182502_sql_jh2stc2v5jr8bnvm.sql`;
+- служебный файл после подключения, например `b24.test_20260508_182502_sql_jh2stc2v5jr8bnvm_after_connect.sql`.
 
-Conceptually this is equivalent to:
+Файл `*_after_connect.sql` не содержит пользовательских данных. Обычно там находятся служебные команды вроде `SET NAMES 'utf8mb4'` и `ALTER DATABASE <DATABASE> COLLATE ...`. Его не нужно анонимизировать, но при пересборке архива он сохраняется и переименовывается синхронно с основным SQL-файлом.
+
+Пример нейминга:
+
+```text
+b24.test_20260508_182502_sql_jh2stc2v5jr8bnvm.sql
+b24.test.anonymized_20260508_182502_sql_jh2stc2v5jr8bnvm.sql
+
+b24.test_20260508_182502_sql_jh2stc2v5jr8bnvm_after_connect.sql
+b24.test.anonymized_20260508_182502_sql_jh2stc2v5jr8bnvm_after_connect.sql
+```
+
+Если `--output` не указан, имя выходного файла строится автоматически по тому же правилу: перед датой добавляется `.anonymized`.
+
+### Схема работы с временной БД
+
+Временная БД - это отдельная техническая база MySQL/MariaDB, которая создаётся только на время обработки одного бэкапа.
+
+Порядок работы:
+
+1. DataVeil читает правила анонимизации из `configuration.yaml`.
+2. Проверяет путь к входному бэкапу, путь к выходному файлу и имя временной БД.
+3. Подключается к MySQL/MariaDB под техническим пользователем.
+4. Создаёт временную БД с именем из `--temp-db`.
+5. Если входной файл - `.tar.gz`, распаковывает архив во временную рабочую директорию.
+6. Импортирует основной SQL-дамп во временную БД.
+7. Запускает preflight/dry-run по импортированной базе.
+8. Если preflight успешен и не включён `--dry-run`, запускает анонимизацию временной БД.
+9. Экспортирует временную БД в новый обезличенный SQL-дамп.
+10. Для Bitrix-архива пересобирает `.tar.gz`: основной SQL заменяется обезличенным, `*_after_connect.sql` сохраняется и переименовывается.
+11. Удаляет временную БД и временные файлы, если не включён `--keep-temp`.
+
+Концептуально это похоже на такую последовательность:
 
 ```bash
 mysql -e "CREATE DATABASE dataveil_tmp_backup"
@@ -117,55 +143,61 @@ mysqldump dataveil_tmp_backup > backup.anonymized.sql
 mysql -e "DROP DATABASE dataveil_tmp_backup"
 ```
 
-The real implementation must perform these steps with validation, error handling, and cleanup.
+Реальная команда выполняет эти шаги с проверками, обработкой ошибок и автоматической очисткой.
 
-### Options
+### Опции backup:anonymize
 
 #### `configuration.yaml`
 
-Required argument. Path to the anonymization configuration file.
+Обязательный аргумент. Путь к YAML-конфигурации анонимизации.
 
-The configuration provides anonymization rules, strategies, consistency groups, and the MySQL server connection used for backup processing. In backup mode the command will run anonymization against the temporary database, not against the live Bitrix24 database from a `.settings.php` file.
+Конфиг содержит правила, стратегии и consistency groups. В backup-режиме эти правила применяются не к живой базе, а к временной БД, созданной из переданного дампа.
 
 #### `--input`
 
-Required option. Path to the source backup.
+Обязательная опция. Путь к исходному бэкапу.
 
-Initial implementation target:
+Примеры:
 
 ```bash
 --input backup.sql
+--input b24.test_20260508_182502_sql_jh2stc2v5jr8bnvm.tar.gz
 ```
 
-The first version should support plain `.sql` dumps. Archive formats such as `.sql.gz`, `.tar.gz`, and `.zip` are planned after the plain SQL workflow is stable.
-
-The input file is read-only. DataVeil must not modify or overwrite it.
+Входной файл используется только для чтения. DataVeil не должен изменять или перезаписывать его.
 
 #### `--output`
 
-Required option. Path where the anonymized dump will be written.
+Необязательная опция. Путь, куда будет записан обезличенный дамп или архив.
 
-Example:
+Пример:
 
 ```bash
 --output backup.anonymized.sql
 ```
 
-The output path must not be the same as `--input`. If the output file already exists, the command should fail unless an explicit overwrite option is added in the future.
+Если `--output` не указан, имя строится автоматически:
+
+```text
+b24.test_20260508_182502_sql_jh2stc2v5jr8bnvm.tar.gz
+b24.test.anonymized_20260508_182502_sql_jh2stc2v5jr8bnvm.tar.gz
+```
+
+Выходной путь не должен совпадать с `--input`. Если выходной файл уже существует, команда завершается ошибкой.
 
 #### `--temp-db`
 
-Required option. Name of the temporary database to create on the MySQL/MariaDB server.
+Обязательная опция. Имя временной БД, которую DataVeil создаст на MySQL/MariaDB-сервере.
 
-Example:
+Пример:
 
 ```bash
 --temp-db dataveil_tmp_backup_20260508
 ```
 
-The database is created before import and dropped after successful export. It must be a dedicated temporary name, not the name of a real Bitrix24 database.
+Эта БД создаётся перед импортом и удаляется после успешного завершения. Имя должно быть техническим и не должно совпадать с реальной базой Bitrix24.
 
-Recommended naming pattern:
+Рекомендуемый формат:
 
 ```text
 dataveil_tmp_<project>_<date>
@@ -173,62 +205,83 @@ dataveil_tmp_<project>_<date>
 
 #### `--dry-run`
 
-Optional flag. Imports the dump into the temporary database and runs preflight checks, but does not run anonymization and does not export an anonymized dump.
+Необязательный флаг. Команда импортирует дамп во временную БД и запускает preflight-проверку, но не выполняет анонимизацию и не экспортирует результат.
 
-Example:
+Пример:
 
 ```bash
 php dataveil.phar backup:anonymize configuration.yaml \
-    --input backup.sql \
-    --output backup.anonymized.sql \
+    --input backup.tar.gz \
     --temp-db dataveil_tmp_backup \
     --dry-run
 ```
 
-Use this mode to verify that the dump can be imported and that the anonymization rules match the imported database schema.
+Используйте этот режим, чтобы проверить, что архив распаковывается, дамп импортируется, а правила анонимизации соответствуют схеме базы.
 
-After the dry run, the temporary database is dropped unless `--keep-temp` is also set.
+После dry-run временная БД удаляется, если не указан `--keep-temp`.
 
 #### `--keep-temp`
 
-Optional flag. Keeps the temporary database after the command finishes or fails.
+Необязательный флаг. Оставляет временную БД и рабочие файлы после завершения команды или после ошибки.
 
-Example:
+Пример:
 
 ```bash
 php dataveil.phar backup:anonymize configuration.yaml \
-    --input backup.sql \
-    --output backup.anonymized.sql \
+    --input backup.tar.gz \
     --temp-db dataveil_tmp_backup \
     --keep-temp
 ```
 
-Use this only for debugging: it allows manual inspection of the imported or anonymized database. Without this flag, the command should clean up the temporary database automatically.
+Флаг нужен только для отладки: можно вручную посмотреть импортированную или уже обезличенную временную БД. Без этого флага DataVeil удаляет временную БД автоматически.
 
-When `--keep-temp` is used, the operator is responsible for deleting the temporary database manually after inspection:
+Если `--keep-temp` включён, оператор сам отвечает за ручное удаление временной БД:
 
 ```sql
 DROP DATABASE dataveil_tmp_backup;
 ```
 
-### Safety protections
+#### `--mysql-bin`
 
-Backup anonymization must include protections against accidentally importing into, modifying, exporting from, or dropping a production database.
+Необязательная опция. Путь к исполняемому файлу `mysql`.
 
-Required protections:
+Пример:
 
-- `--temp-db` must be explicitly provided. The command must not generate or infer a production-like database name.
-- `--temp-db` must not be empty.
-- `--temp-db` must not match dangerous names such as `bitrix`, `b24`, `prod`, `production`, `sitemanager`, `main`, `default`, `mysql`, `information_schema`, `performance_schema`, or `sys`.
-- `--temp-db` must not be equal to the database configured as the main/live database.
-- `--temp-db` should preferably start with a safe prefix such as `dataveil_tmp_`.
-- The command must fail if the temporary database already exists, unless a future explicit reset option is added.
-- The command must print the resolved input path, output path, and temporary database name before starting destructive operations.
-- The command must never drop any database that it did not create during the current run.
-- The command must never modify `--input`.
-- The command must fail if `--output` equals `--input`.
-- The command must fail if `--output` already exists, unless a future explicit overwrite option is added.
-- Cleanup must target only the temporary database created by the command.
-- On failure, cleanup should still run unless `--keep-temp` is enabled.
+```bash
+--mysql-bin "D:\OpenServer\modules\MySQL-8.2\bin\mysql.exe"
+```
 
-These protections are part of the command contract. They should be covered by automated tests before the command is considered ready for production use.
+Если опция не указана, DataVeil попробует использовать `mysql` из `PATH`. На Windows/OpenServer дополнительно выполняется попытка найти бинарник в типовых путях `D:\OpenServer\modules\*\bin\mysql.exe`.
+
+#### `--mysqldump-bin`
+
+Необязательная опция. Путь к исполняемому файлу `mysqldump`.
+
+Пример:
+
+```bash
+--mysqldump-bin "D:\OpenServer\modules\MySQL-8.2\bin\mysqldump.exe"
+```
+
+Если опция не указана, DataVeil попробует использовать `mysqldump` из `PATH`. На Windows/OpenServer дополнительно выполняется попытка найти бинарник в типовых путях `D:\OpenServer\modules\*\bin\mysqldump.exe`.
+
+### Защиты backup-режима
+
+Backup-анонимизация должна защищать от случайного импорта в production, изменения production или удаления не той базы.
+
+Текущие обязательные защиты:
+
+- `--temp-db` должен быть указан явно.
+- `--temp-db` не может быть пустым.
+- `--temp-db` может содержать только буквы, цифры и подчёркивание.
+- `--temp-db` не может быть равен опасным именам: `bitrix`, `b24`, `prod`, `production`, `sitemanager`, `main`, `default`, `mysql`, `information_schema`, `performance_schema`, `sys`.
+- `--temp-db` не может совпадать с основной БД из конфигурации.
+- `--temp-db` должен начинаться с безопасного префикса `dataveil_tmp_`.
+- Команда падает, если временная БД уже существует.
+- Команда не изменяет `--input`.
+- Команда падает, если `--output` совпадает с `--input`.
+- Команда падает, если `--output` уже существует.
+- Cleanup удаляет только временную БД, созданную текущим запуском.
+- При ошибке cleanup всё равно выполняется, если не указан `--keep-temp`.
+
+Эти защиты являются частью контракта команды и должны быть покрыты автотестами.

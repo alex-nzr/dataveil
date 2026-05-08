@@ -44,8 +44,14 @@ class TestConfigurationCommand extends Command
             $io->success("Configuration valid");
             
             $dbConfig = $config->getDatabaseConfig();
-            $io->note(sprintf("Configuration path: %s", $dbConfig['settings_file']));
-            $io->note(sprintf("Configuration name: %s", $dbConfig['connection_name']));
+            $io->note(sprintf("Database source: %s", $dbConfig['source']));
+            if ($dbConfig['source'] === 'bitrix_settings') {
+                $io->note(sprintf("Configuration path: %s", $dbConfig['settings_file']));
+                $io->note(sprintf("Configuration name: %s", $dbConfig['connection_name']));
+            } else {
+                $io->note(sprintf("Database host: %s", $dbConfig['host']));
+                $io->note(sprintf("Database name: %s", $dbConfig['database']));
+            }
             
             $rules = $config->getRules();
             if (!empty($rules)) {

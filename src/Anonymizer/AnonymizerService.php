@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace DataVeil\Anonymizer;
 
 use DataVeil\Config\Configuration;
-use DataVeil\Config\BitrixSettingsParser;
 use DataVeil\Database\Connection;
+use DataVeil\Database\ConnectionFactory;
 use DataVeil\Consistency\ConsistencyProcessor;
 use DataVeil\Serializer\SerializerHandler;
 use DataVeil\Strategy\StrategyManager;
@@ -22,20 +22,7 @@ class AnonymizerService
     {
         $this->config = $config;
 
-        $dbConfig = $config->getDatabaseConfig();
-        $parser = new BitrixSettingsParser(
-            $dbConfig["settings_file"],
-            $dbConfig["connection_name"],
-        );
-
-        $connectionParams = $parser->parse();
-
-        $this->connection = new Connection(
-            $connectionParams["host"],
-            $connectionParams["database"],
-            $connectionParams["login"],
-            $connectionParams["password"],
-        );
+        $this->connection = (new ConnectionFactory())->create($config);
 
         $strategyManager = new StrategyManager();
         $serializerHandler = new SerializerHandler();
@@ -93,7 +80,7 @@ class AnonymizerService
 
             $strategyManager = new StrategyManager();
             if ($strategyManager->getStrategy($strategy, $options) === null) {
-                throw new DataVeilException("Strategry {$strategy} not found");
+                throw new DataVeilException("Strategy {$strategy} not found");
             }
 
             $stmt = $this->connection->prepare(
