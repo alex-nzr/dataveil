@@ -50,4 +50,16 @@ class ConfigurationTest extends TestCase
 
         $this->assertIsArray($rules);
     }
+
+    public function testLoadMinimalBitrix24CrmConfiguration(): void
+    {
+        $configPath = __DIR__ . '/../../../configuration_bitrix24_crm_minimal.yaml';
+
+        $this->assertFileExists($configPath);
+
+        $config = new Configuration($configPath);
+
+        $this->assertNotEmpty($config->getRules());
+        $this->assertNotEmpty($config->getConsistencyGroups());
+    }
 }

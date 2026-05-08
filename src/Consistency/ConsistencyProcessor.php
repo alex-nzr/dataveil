@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace DataVeil\Consistency;
 
-use DataVeil\Config\Configuration;
 use DataVeil\Database\Connection;
 use DataVeil\Serializer\SerializerHandler;
 use DataVeil\Strategy\StrategyManager;
@@ -57,6 +56,7 @@ class ConsistencyProcessor
         $anchorData = $this->fetchAnchorData($anchorTable, $idColumn, $contextColumns, $filters);
 
         foreach ($anchorData as $anchorRow) {
+            $anchorRow['_table'] = $anchorTable;
             $anchorId = $anchorRow[$idColumn];
             $salt = $saltSource === 'row_id' ? (string) $anchorId : null;
 
@@ -91,7 +91,9 @@ class ConsistencyProcessor
         array $contextColumns,
         array $filters
     ): array {
-        $sql = 'SELECT ' . $idColumn . ', ' . implode(', ', $contextColumns);
+        $params = [];
+        $selectColumns = array_values(array_unique(array_merge([$idColumn], $contextColumns)));
+        $sql = 'SELECT ' . implode(', ', $selectColumns);
         $sql .= ' FROM ' . $table;
 
         if (!empty($filters)) {
@@ -142,8 +144,16 @@ class ConsistencyProcessor
 
         $join = $target['join'] ?? [];
 
-        if (isset($join['serialized_value_match'])) {
-            $this->updateSerializedField($targetTable, $targetColumn, $anchorRow, $newValue, $join);
+        if (($join['type'] ?? null) === 'serialized_value_match') {
+            $serializationConfig = $target['serialization'] ?? [];
+            $this->updateSerializedField(
+                $targetTable,
+                $targetColumn,
+                $anchorRow,
+                $newValue,
+                $join,
+                is_array($serializationConfig) ? $serializationConfig : [],
+            );
         } else {
             $this->updatePlainField($targetTable, $targetColumn, $anchorRow, $newValue, $join, $anchorId);
         }
@@ -165,7 +175,7 @@ class ConsistencyProcessor
         array $join,
         int $anchorId
     ): void {
-        if ($table === $anchorRow['table']) {
+        if ($table === ($anchorRow['_table'] ?? null)) {
             $idColumn = $join['key_column'] ?? 'ID';
             $this->updateById($table, $column, $newValue, $anchorId, $idColumn);
         } elseif (isset($join['key_column'], $join['ref_column'])) {
@@ -188,33 +198,41 @@ class ConsistencyProcessor
      * @param      array<mixed>   $anchorRow  The anchor row
      * @param      string  $newValue   The new value
      * @param      array<mixed>   $join       The join
+     * @param      array<string, mixed> $serializationConfig The serialization config
      */
     private function updateSerializedField(
         string $table,
         string $column,
         array $anchorRow,
         string $newValue,
-        array $join
+        array $join,
+        array $serializationConfig
     ): void {
-        $serializedData = $this->getSerializedField($table, $column, $anchorRow, $join);
-
-        if ($serializedData === null) {
-            return;
-        }
-
-        $serializationConfig = $join['serialization'] ?? [];
-        $matchKey = $serializationConfig['match_key'];
+        $rows = $this->getSerializedRows($table, $column, $anchorRow, $join);
+        $matchKey = (string) ($serializationConfig['match_key'] ?? '');
         $matchValueSource = $serializationConfig['match_value_source'] ?? '';
         $matchValue = $this->extractAnchorValue($matchValueSource, $anchorRow);
 
-        $newSerialized = $this->serializerHandler->findAndReplaceInSerialized(
-            $serializedData,
-            $matchKey,
-            strval($matchValue),
-            $newValue
-        );
+        if ($matchKey === '' || $matchValue === null) {
+            return;
+        }
 
-        $this->updateSerializedInTable($table, $column, $newSerialized, $anchorRow, $join);
+        foreach ($rows as $row) {
+            $serializedData = $row[$column] ?? null;
+
+            if (!is_string($serializedData)) {
+                continue;
+            }
+
+            $newSerialized = $this->serializerHandler->findAndReplaceInSerialized(
+                $serializedData,
+                $matchKey,
+                strval($matchValue),
+                $newValue
+            );
+
+            $this->updateSerializedInTable($table, $column, $newSerialized, (int) $row['ID']);
+        }
     }
 
     /**
@@ -223,34 +241,59 @@ class ConsistencyProcessor
      * @param      array<mixed>        $anchorRow  The anchor row
      * @param      array<mixed>        $join       The join
      *
-     * @return     null|string  The serialized field.
+     * @return     array<int, array<string, mixed>>
      */
-    private function getSerializedField(
+    private function getSerializedRows(
         string $table,
         string $column,
         array $anchorRow,
         array $join
-    ): ?string {
-        $idColumn = $join['key_column'] ?? 'ID';
-        $idValue = $anchorRow[$idColumn] ?? null;
+    ): array {
+        $entityIdColumn = (string) ($join['entity_id_column'] ?? 'OWNER_ID');
+        $refEntityColumn = (string) ($join['ref_entity_column'] ?? 'ENTITY_ID');
+        $entityId = $anchorRow[$refEntityColumn] ?? null;
 
-        if ($idValue === null) {
-            return null;
+        if ($entityId === null) {
+            return [];
         }
 
-        $stmt = $this->connection->prepare(
-            "SELECT {$column} FROM {$table} WHERE {$idColumn} = ?"
+        $where = ["{$entityIdColumn} = ?"];
+        $params = [$entityId];
+        $types = is_int($entityId) || ctype_digit((string) $entityId) ? 'i' : 's';
+
+        if (isset($join['filters']) && \is_array($join['filters'])) {
+            foreach ($join['filters'] as $filter) {
+                if (!is_array($filter) || !isset($filter['column'])) {
+                    continue;
+                }
+
+                $where[] = "{$filter['column']} = ?";
+                $filterValue = $this->resolveFilterValue($filter, $anchorRow);
+                $params[] = $filterValue;
+                $types .= is_int($filterValue) || ctype_digit((string) $filterValue) ? 'i' : 's';
+            }
+        }
+
+        $sql = sprintf(
+            'SELECT ID, %s FROM %s WHERE %s',
+            $column,
+            $table,
+            implode(' AND ', $where),
         );
-        $stmt->bind_param('i', $idValue);
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $result = $stmt->get_result();
         assert($result instanceof \mysqli_result);
-        $row = $result->fetch_assoc();
+        $rows = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+
         $stmt->close();
 
-        return is_array($row) && isset($row[$column]) && is_string($row[$column])
-            ? $row[$column]
-            : null;
+        return $rows;
     }
 
     /**
@@ -277,40 +320,20 @@ class ConsistencyProcessor
      * @param      string  $table          The table
      * @param      string  $column         The column
      * @param      string  $newSerialized  The new serialized
-     * @param      array<mixed>   $anchorRow      The anchor row
-     * @param      array<mixed>   $join           The join
+     * @param      int     $id             The row identifier
      */
     private function updateSerializedInTable(
         string $table,
         string $column,
         string $newSerialized,
-        array $anchorRow,
-        array $join
+        int $id
     ): void {
-        $entityIdColumn = $join['entity_id_column'] ?? 'OWNER_ID';
-        $entityId = $anchorRow[$entityIdColumn] ?? null;
-
-        if ($entityId === null) {
-            return;
-        }
-
-        $entityIdColumnEscaped = $this->connection->escape($entityIdColumn);
-        $tableEscaped = $this->connection->escape($table);
-        $columnEscaped = $this->connection->escape($column);
-        $newSerializedEscaped = $this->connection->escape($newSerialized);
-        $entityIdEscaped = $this->connection->escape($entityId);
-
-        $filtersSql = '';
-        if (isset($join['filters']) && \is_array($join['filters'])) {
-            $filterClauses = [];
-            foreach ($join['filters'] as $filter) {
-                $filterClauses[] = "{$filter['column']} = '{$filter['value']}'";
-            }
-            $filtersSql = ' AND ' . implode(' AND ', $filterClauses);
-        }
-
-        $sql = "UPDATE {$tableEscaped} SET {$columnEscaped} = '{$newSerializedEscaped}' WHERE {$entityIdColumn} = {$entityIdEscaped}{$filtersSql}";
-        $this->connection->query($sql);
+        $stmt = $this->connection->prepare(
+            "UPDATE {$table} SET {$column} = ? WHERE ID = ?"
+        );
+        $stmt->bind_param('si', $newSerialized, $id);
+        $stmt->execute();
+        $stmt->close();
     }
 
     private function updateById(string $table, string $column, string $value, int $id, string $idColumn): void
@@ -336,5 +359,18 @@ class ConsistencyProcessor
         $stmt->bind_param('ss', $value, $anchorValue);
         $stmt->execute();
         $stmt->close();
+    }
+
+    /**
+     * @param array<string, mixed> $filter
+     * @param array<string, mixed> $anchorRow
+     */
+    private function resolveFilterValue(array $filter, array $anchorRow): mixed
+    {
+        if (isset($filter['value_source']) && is_string($filter['value_source'])) {
+            return $this->extractAnchorValue($filter['value_source'], $anchorRow);
+        }
+
+        return $filter['value'] ?? '';
     }
 }

@@ -8,6 +8,8 @@
 2. **rules**: простые правила анонимизации.
 3. **consistency_groups**: сложные взаимосвязи, требующие согласованности данных.
 
+Для минимального CRM-сценария Bitrix24 в репозитории есть пример `configuration_bitrix24_crm_minimal.yaml`. Он покрывает пользователей, лиды, контакты, компании, сделки, реквизиты, CRM-индексы и мультиполя телефонов/email.
+
 ## Раздел database
 
 Содержит информацию для подключения к базе данных.
@@ -111,6 +113,24 @@ consistency_groups:
                 match_key: "PHONE"
                 match_value_source: "anchor.VALUE"
 ```
+
+Для serialized-связей используется `join.type: "serialized_value_match"`. Фильтры могут брать значение из anchor-строки через `value_source`, например:
+
+```yaml
+join:
+    type: "serialized_value_match"
+    entity_id_column: "OWNER_ID"
+    ref_entity_column: "ENTITY_ID"
+    filters:
+        - column: "OWNER_TYPE_ID"
+          value_source: "anchor.ENTITY_TYPE_ID"
+serialization:
+    type: "php_serialize"
+    match_key: "PHONE"
+    match_value_source: "anchor.VALUE"
+```
+
+Такой вариант используется для синхронизации телефонов и email из `b_crm_field_multi` со связанными serialized-данными активности.
 
 ### Типовые сценарии
 

@@ -6,6 +6,7 @@ namespace DataVeil\Command;
 
 use DataVeil\Config\Configuration;
 use DataVeil\Anonymizer\AnonymizerService;
+use DataVeil\Anonymizer\AnonymizationPreflight;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -22,8 +23,9 @@ class AnonymizeCommand extends Command
 {
     //private Configuration $config;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly ?AnonymizationPreflight $preflight = null,
+    ) {
         parent::__construct();
     }
 
@@ -65,8 +67,7 @@ class AnonymizeCommand extends Command
 
         if ($dryRun) {
             $io->note('Dry run mode - no changes will be made');
-            $this->showDryRunInfo($config, $io);
-            return Command::SUCCESS;
+            return $this->showDryRunInfo($config, $io);
         }
 
         $io->info('Starting database anonymization...');
@@ -83,19 +84,53 @@ class AnonymizeCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function showDryRunInfo(Configuration $config, SymfonyStyle $io): void
+    private function showDryRunInfo(Configuration $config, SymfonyStyle $io): int
     {
-        $rules = $config->getRules();
-        $groups = $config->getConsistencyGroups();
+        try {
+            $report = ($this->preflight ?? new AnonymizationPreflight())->check($config);
+        } catch (\Exception $e) {
+            $io->error('Dry run failed: ' . $e->getMessage());
+            return Command::FAILURE;
+        }
 
         $io->section('Rules that will be applied');
-        foreach ($rules as $rule) {
-            $io->text("  - Table '{$rule['name']}': {$rule['action']}");
+        foreach ($report['rules'] as $rule) {
+            $rows = $rule['rows'] === null ? 'n/a' : (string) $rule['rows'];
+            $io->text(sprintf(
+                "  - Table '%s': %s, fields: %d, rows: %s",
+                (string) $rule['table'],
+                (string) $rule['action'],
+                (int) $rule['fields'],
+                $rows,
+            ));
         }
 
         $io->section('Consistency Groups');
-        foreach ($groups as $group) {
-            $io->text("  - {$group['id']}");
+        foreach ($report['consistency_groups'] as $group) {
+            $rows = $group['rows'] === null ? 'n/a' : (string) $group['rows'];
+            $io->text(sprintf(
+                "  - %s: anchor %s, targets: %d, rows: %s",
+                (string) $group['id'],
+                (string) $group['anchor_table'],
+                (int) $group['targets'],
+                $rows,
+            ));
         }
+
+        foreach ($report['warnings'] as $warning) {
+            $io->warning($warning);
+        }
+
+        if ($report['errors'] !== []) {
+            foreach ($report['errors'] as $error) {
+                $io->error($error);
+            }
+
+            return Command::FAILURE;
+        }
+
+        $io->success('Dry run completed successfully');
+
+        return Command::SUCCESS;
     }
 }

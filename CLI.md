@@ -68,11 +68,12 @@ The command reads anonymization rules, connects to the configured database, and 
 
 ## anonymize --dry-run
 
-Shows the anonymization plan without applying changes.
+Runs a preflight check without applying changes.
 
 ```bash
 php dataveil.phar anonymize configuration.yaml --dry-run
 ```
 
-Use this command to review which rules and consistency groups are configured before running the real anonymization command.
+The command connects to the configured database and uses metadata and SELECT queries to verify that configured tables, columns, strategies, and consistency groups can be processed. It prints the rules, consistency groups, and row counts that would be affected.
 
+Use this command after `test:db-connection` and before the real anonymization command.
