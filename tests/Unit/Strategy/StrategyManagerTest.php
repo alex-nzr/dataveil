@@ -46,6 +46,20 @@ class StrategyManagerTest extends TestCase
         $this->assertNotEmpty($lastname);
     }
 
+    public function testFakeMiddlenameStrategy(): void
+    {
+        $middlename = $this->strategyManager->generate("middlename_fake", "1");
+
+        $this->assertNotEmpty($middlename);
+    }
+
+    public function testFakeCompanyStrategy(): void
+    {
+        $company = $this->strategyManager->generate("company_fake", "1");
+
+        $this->assertStringStartsWith('ООО "', $company);
+    }
+
     public function testStringRandomStrategy(): void
     {
         $strategy = new StringRandomStrategy(
@@ -70,6 +84,31 @@ class StrategyManagerTest extends TestCase
 
         $this->assertStringStartsWith("user_", $result);
         $this->assertEquals(15, strlen($result));
+    }
+
+    public function testNumberFakeStrategy(): void
+    {
+        $result = $this->strategyManager->generate(
+            "number_fake",
+            "123456",
+            options: ["min" => 10, "max" => 20],
+        );
+
+        $this->assertGreaterThanOrEqual(10, (int) $result);
+        $this->assertLessThanOrEqual(20, (int) $result);
+    }
+
+    public function testAmountFakeStrategy(): void
+    {
+        $result = $this->strategyManager->generate(
+            "amount_fake",
+            "123456",
+            options: ["min" => 1000, "max" => 2000, "decimals" => 2],
+        );
+
+        $this->assertMatchesRegularExpression('/^\d+\.\d{2}$/', $result);
+        $this->assertGreaterThanOrEqual(1000, (float) $result);
+        $this->assertLessThanOrEqual(2001, (float) $result);
     }
 
     public function testEmptyGeneration(): void

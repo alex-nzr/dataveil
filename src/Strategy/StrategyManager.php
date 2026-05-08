@@ -17,6 +17,10 @@ class StrategyManager
         $this->register(new FakePhoneStrategy());
         $this->register(new FakeNameStrategy());
         $this->register(new FakeLastnameStrategy());
+        $this->register(new FakeMiddlenameStrategy());
+        $this->register(new FakeCompanyStrategy());
+        $this->register(new NumberFakeStrategy());
+        $this->register(new NumberFakeStrategy('amount_fake', ['decimals' => 2, 'min' => 1000, 'max' => 100000]));
         $this->register(new StringRandomStrategy());
         $this->register(new EmptyStringStrategy());
     }
@@ -77,6 +81,13 @@ class StrategyManager
             );
         }
 
+        if ($strategyName === 'number_fake' || $strategyName === 'amount_fake') {
+            return new NumberFakeStrategy(
+                strategyName: $strategyName,
+                options: $this->normalizeNumberOptions($strategyName, $options),
+            );
+        }
+
         return null;
     }
 
@@ -94,6 +105,33 @@ class StrategyManager
 
         if (isset($options['length'])) {
             $normalized['length'] = (int) $options['length'];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, string|int|bool>
+     */
+    private function normalizeNumberOptions(string $strategyName, array $options): array
+    {
+        $normalized = [];
+
+        if ($strategyName === 'amount_fake') {
+            $normalized['decimals'] = 2;
+            $normalized['min'] = 1000;
+            $normalized['max'] = 100000;
+        }
+
+        foreach (['min', 'max', 'decimals'] as $optionName) {
+            if (isset($options[$optionName])) {
+                $normalized[$optionName] = (int) $options[$optionName];
+            }
+        }
+
+        if (isset($options['preserve_sign'])) {
+            $normalized['preserve_sign'] = (bool) $options['preserve_sign'];
         }
 
         return $normalized;
