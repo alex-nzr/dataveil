@@ -52,4 +52,5 @@ coverage/
 # Local workspace artifacts
 /.osp/
 /test-results
+/test-reports/
 /NEXT_WORK_PLAN.md
