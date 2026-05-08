@@ -29,6 +29,10 @@ $ ./dataveil.phar anonymize config.yaml
 
 [Планы по развитию.](./ROADMAP.md)
 
+Дополнительно:
+- [CLI-команды](./CLI.md)
+- [Runbook обработки Bitrix24-бэкапа](./RUNBOOK.md)
+
 ## Лицензия
 
 MIT License

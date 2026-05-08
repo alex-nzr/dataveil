@@ -194,6 +194,35 @@ generator:
 
 `salt_source: "id"` используется в обычных `rules.tables[].fields`, где есть текущая строка обновляемой таблицы и её первичный ключ `ID`. В `consistency_groups` лучше использовать `row_id`, потому что якорем может быть не основная сущность, а отдельная строка связи или мультиполя.
 
+Пример различия:
+
+```yaml
+# Обычное правило по таблице контактов:
+# salt_source: "id" берёт b_crm_contact.ID
+rules:
+    tables:
+        - name: "b_crm_contact"
+          action: "update"
+          fields:
+              - column: "NAME"
+                strategy: "name_fake"
+                salt_source: "id"
+
+# Группа согласованности по мультиполям:
+# salt_source: "row_id" берёт b_crm_field_multi.ID из anchor.id_column
+consistency_groups:
+    - id: "crm_phone_unique"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+      generator:
+          deterministic: true
+          strategy: "phone_fake"
+          salt_source: "row_id"
+```
+
+Почему для телефонов/email лучше `row_id`: один контакт может иметь несколько строк в `b_crm_field_multi`. Если использовать ID контакта как соль, несколько телефонов одного контакта могут получить одинаковые или слишком похожие значения. Если использовать ID строки мультиполя, каждый телефон/email получает собственное стабильное значение.
+
 ### targets
 
 `targets` описывает, куда записать новое значение:
@@ -238,19 +267,88 @@ serialization:
 
 Такой вариант используется для синхронизации телефонов и email из `b_crm_field_multi` со связанными serialized-данными активности.
 
+### serialization
+
+`serialization` используется, когда target-колонка хранит не обычную строку, а PHP-serialized массив. В Bitrix24 такие поля встречаются в активностях, timeline и служебных настройках.
+
+```yaml
+serialization:
+    type: "php_serialize"
+    match_key: "PHONE"
+    match_value_source: "anchor.VALUE"
+```
+
+- `type: "php_serialize"` говорит DataVeil, что колонку нужно распаковать как PHP-serialize, изменить внутри и собрать обратно.
+- `match_key` - ключ внутри массива, который нужно найти.
+- `match_value_source` - откуда взять старое значение для сравнения. `anchor.VALUE` означает: взять колонку `VALUE` из текущей anchor-строки.
+
+Так DataVeil не заменяет все телефоны подряд внутри serialized-данных, а ищет именно старый телефон текущей anchor-строки.
+
 ### Типовые сценарии
 
 #### Сценарий 1: простой якорь -> цель
 
 Используется, когда нужно обновить ту же строку, из которой взяли исходное значение. Например, заменить `VALUE` в самой таблице `b_crm_field_multi`.
 
+```yaml
+consistency_groups:
+    - id: "crm_phone_value"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+          context_columns: ["VALUE", "TYPE_ID"]
+          filters:
+              - column: "TYPE_ID"
+                value: "PHONE"
+      generator:
+          deterministic: true
+          strategy: "phone_fake"
+          salt_source: "row_id"
+      targets:
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            join: { key_column: "ID", ref_column: "ID" }
+```
+
 #### Сценарий 2: якорь -> несколько целей
 
 Используется, когда одно значение продублировано в нескольких таблицах. Например, email нужно заменить и в `b_crm_field_multi`, и в `b_crm_act_comm`.
 
+```yaml
+consistency_groups:
+    - id: "crm_email_sync"
+      anchor:
+          table: "b_crm_field_multi"
+          id_column: "ID"
+          context_columns: ["ENTITY_ID", "VALUE", "TYPE_ID"]
+          filters:
+              - column: "TYPE_ID"
+                value: "EMAIL"
+      generator:
+          deterministic: true
+          strategy: "email_fake"
+          salt_source: "row_id"
+      targets:
+          - table: "b_crm_field_multi"
+            column: "VALUE"
+            join: { key_column: "ID", ref_column: "ID" }
+          - table: "b_crm_act_comm"
+            column: "ENTITY_SETTINGS"
+            join:
+                type: "serialized_value_match"
+                entity_id_column: "OWNER_ID"
+                ref_entity_column: "ENTITY_ID"
+            serialization:
+                type: "php_serialize"
+                match_key: "EMAIL"
+                match_value_source: "anchor.VALUE"
+```
+
 #### Сценарий 3: якорь -> serialized-поле
 
 Используется, когда старое значение лежит внутри PHP-serialized массива. DataVeil читает сериализованное поле, ищет нужный ключ и старое значение, заменяет его на новое и записывает сериализованный массив обратно.
+
+Важно: serialized-сценарий не является универсальным поиском по всему массиву. Нужно явно указать `match_key` и `match_value_source`, чтобы DataVeil заменял только ожидаемое значение и не ломал структуру поля.
 
 ## Смарт-процессы Bitrix24
 
