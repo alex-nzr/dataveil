@@ -60,6 +60,14 @@ class StrategyManagerTest extends TestCase
         $this->assertStringStartsWith('ООО "', $company);
     }
 
+    public function testFakeJobTitleStrategy(): void
+    {
+        $jobTitle = $this->strategyManager->generate("job_title_fake", "1");
+
+        $this->assertNotEmpty($jobTitle);
+        $this->assertStringNotContainsString("post_", $jobTitle);
+    }
+
     public function testStringRandomStrategy(): void
     {
         $strategy = new StringRandomStrategy(
