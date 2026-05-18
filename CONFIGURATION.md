@@ -68,6 +68,7 @@ DataVeil выбирает источник строго по `database.source`.
 - `comment` - опциональный комментарий для таблицы
 - `fields` - описание обезличиваемых столбцов
 - `where` - ограничения (SQL WHERE) для `update` действия
+- `id_column` - колонка-ключ для `update`; по умолчанию используется `ID`
 
 ### Очистка таблицы
 
@@ -109,6 +110,20 @@ rules:
 - `LOGIN` - будет состоять из 10 символов с префиксом `user_`
 - `NAME` - будет заменен на имея 
 - `PERSONAL_PHONE` - будет заменен на телефон
+
+Если в таблице нет колонки `ID`, укажите ключевую колонку явно через `id_column`. Это нужно, например, для одиночных пользовательских полей Bitrix в таблицах `b_uts_*`, где идентификатор сущности хранится в `VALUE_ID`:
+
+```yaml
+rules:
+    tables:
+        - name: "b_uts_crm_contact"
+          action: "update"
+          id_column: "VALUE_ID"
+          fields:
+              - column: "UF_CRM_COMMENT"
+                strategy: "string_random"
+                salt_source: "row_id"
+```
 
 ## Группы согласованности
 

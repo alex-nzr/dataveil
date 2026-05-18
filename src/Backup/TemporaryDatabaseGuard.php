@@ -25,7 +25,7 @@ class TemporaryDatabaseGuard
         'sys',
     ];
 
-    public function assertSafe(string $tempDatabase, ?string $configuredDatabase = null): void
+    public function assertSafe(string $tempDatabase, ?string $configuredDatabase = null, bool $allowConfiguredDatabase = false): void
     {
         $normalized = strtolower(trim($tempDatabase));
 
@@ -41,7 +41,7 @@ class TemporaryDatabaseGuard
             throw new DataVeilException("Unsafe temporary database name: {$tempDatabase}");
         }
 
-        if ($configuredDatabase !== null && strtolower($configuredDatabase) === $normalized) {
+        if (!$allowConfiguredDatabase && $configuredDatabase !== null && strtolower($configuredDatabase) === $normalized) {
             throw new DataVeilException('Temporary database must not match configured database');
         }
 

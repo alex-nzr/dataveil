@@ -25,6 +25,7 @@ class BackupAnonymizationService
      *     input: string,
      *     output?: string|null,
      *     temp_db: string,
+     *     reuse_temp_db?: bool,
      *     dry_run: bool,
      *     keep_temp: bool,
      *     mysql_bin: string,
@@ -37,10 +38,11 @@ class BackupAnonymizationService
         $inputPath = $this->normalizePath($options['input']);
         $outputPath = $this->nameResolver->resolveOutputPath($inputPath, $options['output'] ?? null);
         $tempDatabase = $options['temp_db'];
+        $reuseTempDatabase = (bool) ($options['reuse_temp_db'] ?? false);
         $connectionParams = $this->connectionFactory->resolveParams($config);
 
         $this->validatePaths($inputPath, $outputPath, (bool) $options['dry_run']);
-        $this->guard->assertSafe($tempDatabase, $connectionParams['database']);
+        $this->guard->assertSafe($tempDatabase, $connectionParams['database'], $reuseTempDatabase);
 
         $workDirectory = $this->createWorkDirectory();
         $mysqlParams = [
@@ -62,12 +64,19 @@ class BackupAnonymizationService
 
         try {
             if ($mysql->databaseExists($tempDatabase)) {
-                throw new DataVeilException("Temporary database already exists: {$tempDatabase}");
+                if (!$reuseTempDatabase) {
+                    throw new DataVeilException("Temporary database already exists: {$tempDatabase}");
+                }
+
+                $mysql->clearDatabase($tempDatabase);
+            } elseif ($reuseTempDatabase) {
+                throw new DataVeilException("Temporary database does not exist and --reuse-temp-db is enabled: {$tempDatabase}");
+            } else {
+                $mysql->createDatabase($tempDatabase);
+                $createdDatabase = true;
             }
 
             $archive = $this->archiveHandler->unpack($inputPath, $workDirectory);
-            $mysql->createDatabase($tempDatabase);
-            $createdDatabase = true;
             $mysql->importSql($tempDatabase, $archive->mainSqlPath);
 
             $runtimeConfig = $this->createRuntimeConfig($config, $connectionParams, $tempDatabase);
@@ -93,7 +102,9 @@ class BackupAnonymizationService
                 'consistency_groups' => count($preflightReport['consistency_groups']),
             ];
         } finally {
-            if ($createdDatabase && !$options['keep_temp']) {
+            if ($reuseTempDatabase && !$options['keep_temp']) {
+                $mysql->clearDatabase($tempDatabase);
+            } elseif ($createdDatabase && !$options['keep_temp']) {
                 $mysql->dropDatabase($tempDatabase);
             }
 

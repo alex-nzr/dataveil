@@ -81,6 +81,7 @@ class AnonymizationPreflight
     ): array {
         $table = (string) ($rule['name'] ?? '');
         $action = (string) ($rule['action'] ?? '');
+        $idColumn = (string) ($rule['id_column'] ?? 'ID');
         $fields = is_array($rule['fields'] ?? null) ? $rule['fields'] : [];
         $where = isset($rule['where']) && is_string($rule['where']) ? $rule['where'] : '1=1';
         $errors = [];
@@ -95,8 +96,8 @@ class AnonymizationPreflight
             $columns = $this->getColumns($connection, $tableColumns, $table);
 
             if ($action === 'update') {
-                if (!in_array('ID', $columns, true)) {
-                    $errors[] = "Table '{$table}' must have ID column for update rules";
+                if ($idColumn === '' || !in_array($idColumn, $columns, true)) {
+                    $errors[] = "Table '{$table}' must have '{$idColumn}' column for update rules";
                 }
 
                 foreach ($fields as $field) {

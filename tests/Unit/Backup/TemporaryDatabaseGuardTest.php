@@ -32,6 +32,13 @@ class TemporaryDatabaseGuardTest extends TestCase
         (new TemporaryDatabaseGuard())->assertSafe('dataveil_tmp_backup', 'dataveil_tmp_backup');
     }
 
+    public function testAllowsConfiguredDatabaseNameForReuseMode(): void
+    {
+        (new TemporaryDatabaseGuard())->assertSafe('dataveil_tmp_backup', 'dataveil_tmp_backup', true);
+
+        $this->addToAssertionCount(1);
+    }
+
     public function testRejectsNameWithoutSafePrefix(): void
     {
         $this->expectException(DataVeilException::class);

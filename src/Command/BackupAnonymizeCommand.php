@@ -32,6 +32,7 @@ class BackupAnonymizeCommand extends Command
         $this->addOption('input', null, InputOption::VALUE_REQUIRED, 'Source .sql or .tar.gz Bitrix backup');
         $this->addOption('output', null, InputOption::VALUE_REQUIRED, 'Output anonymized backup path');
         $this->addOption('temp-db', null, InputOption::VALUE_REQUIRED, 'Temporary database name');
+        $this->addOption('reuse-temp-db', null, InputOption::VALUE_NONE, 'Reuse existing temporary database and clean its objects instead of creating/dropping it');
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Import backup and run preflight without anonymization/export');
         $this->addOption('keep-temp', null, InputOption::VALUE_NONE, 'Keep temporary database and files after completion');
         $this->addOption('mysql-bin', null, InputOption::VALUE_REQUIRED, 'Path to mysql binary', 'mysql');
@@ -70,6 +71,7 @@ class BackupAnonymizeCommand extends Command
                 'input' => $inputPath,
                 'output' => is_string($input->getOption('output')) ? $input->getOption('output') : null,
                 'temp_db' => $tempDatabase,
+                'reuse_temp_db' => (bool) $input->getOption('reuse-temp-db'),
                 'dry_run' => (bool) $input->getOption('dry-run'),
                 'keep_temp' => (bool) $input->getOption('keep-temp'),
                 'mysql_bin' => (string) $input->getOption('mysql-bin'),

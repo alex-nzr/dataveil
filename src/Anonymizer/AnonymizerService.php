@@ -69,6 +69,7 @@ class AnonymizerService
     private function updateTableFields(array $rule): void
     {
         $table = $rule["name"];
+        $idColumn = $rule["id_column"] ?? "ID";
         $fields = $rule["fields"] ?? [];
         $where = $rule["where"] ?? "1=1";
 
@@ -84,7 +85,7 @@ class AnonymizerService
             }
 
             $stmt = $this->connection->prepare(
-                "SELECT ID, {$column} FROM {$table} WHERE {$where}",
+                "SELECT {$idColumn} AS __dataveil_row_id, {$column} FROM {$table} WHERE {$where}",
             );
             $stmt->execute();
             $result = $stmt->get_result();
@@ -95,11 +96,11 @@ class AnonymizerService
             }
 
             while ($row = $result->fetch_assoc()) {
-                $id = $row["ID"];
+                $id = $row["__dataveil_row_id"];
                 $originalValue = $row[$column];
 
                 $salt = null;
-                if ($saltSource === "id") {
+                if ($saltSource === "id" || $saltSource === "row_id") {
                     $salt = (string) $id;
                 } elseif ($saltSource === "value") {
                     $salt = $originalValue;
@@ -113,7 +114,7 @@ class AnonymizerService
                 );
 
                 $updateStmt = $this->connection->prepare(
-                    "UPDATE {$table} SET {$column} = ? WHERE ID = ?",
+                    "UPDATE {$table} SET {$column} = ? WHERE {$idColumn} = ?",
                 );
                 $updateStmt->bind_param("si", $newValue, $id);
                 $updateStmt->execute();

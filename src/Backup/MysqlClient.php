@@ -15,6 +15,7 @@ class MysqlClient
         private readonly array $params,
         string $mysqlBinary = 'mysql',
         string $mysqldumpBinary = 'mysqldump',
+        private readonly SqlDumpNormalizer $dumpNormalizer = new SqlDumpNormalizer(),
     ) {
         $this->mysqlBinary = $this->resolveBinary($mysqlBinary);
         $this->mysqldumpBinary = $this->resolveBinary($mysqldumpBinary);
@@ -33,6 +34,40 @@ class MysqlClient
         $this->runMysqlStatement("DROP DATABASE `{$database}`");
     }
 
+    public function clearDatabase(string $database): void
+    {
+        $objects = $this->databaseObjects($database);
+
+        if ($objects === []) {
+            return;
+        }
+
+        $statements = ['SET FOREIGN_KEY_CHECKS=0'];
+
+        foreach ($objects as $object) {
+            if ($object['type'] === 'VIEW') {
+                $statements[] = sprintf(
+                    'DROP VIEW IF EXISTS `%s`.`%s`',
+                    $this->escapeIdentifier($database),
+                    $this->escapeIdentifier($object['name']),
+                );
+            }
+        }
+
+        foreach ($objects as $object) {
+            if ($object['type'] !== 'VIEW') {
+                $statements[] = sprintf(
+                    'DROP TABLE IF EXISTS `%s`.`%s`',
+                    $this->escapeIdentifier($database),
+                    $this->escapeIdentifier($object['name']),
+                );
+            }
+        }
+
+        $statements[] = 'SET FOREIGN_KEY_CHECKS=1';
+        $this->runMysqlStatement(implode(';', $statements));
+    }
+
     public function databaseExists(string $database): bool
     {
         $output = $this->runMysqlStatement(
@@ -40,6 +75,36 @@ class MysqlClient
         );
 
         return trim($output) !== '';
+    }
+
+    /**
+     * @return array<int, array{type: string, name: string}>
+     */
+    private function databaseObjects(string $database): array
+    {
+        $output = $this->runMysqlStatement(
+            "SELECT TABLE_TYPE, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{$database}'",
+        );
+        $objects = [];
+
+        foreach (preg_split('/\r?\n/', trim($output)) ?: [] as $line) {
+            $parts = preg_split('/\s+/', trim($line), 2);
+
+            if ($parts === false || count($parts) !== 2 || !in_array($parts[0], ['BASE', 'VIEW', 'SYSTEM'], true)) {
+                continue;
+            }
+
+            $type = $parts[0] === 'VIEW' ? 'VIEW' : 'TABLE';
+            $name = $parts[0] === 'BASE' && str_starts_with($parts[1], 'TABLE ')
+                ? substr($parts[1], 6)
+                : $parts[1];
+
+            if ($name !== '') {
+                $objects[] = ['type' => $type, 'name' => $name];
+            }
+        }
+
+        return $objects;
     }
 
     public function importSql(string $database, string $sqlPath): void
@@ -56,12 +121,13 @@ class MysqlClient
             $this->mysqlCommand($this->mysqldumpBinary, $database),
             [['pipe', 'r'], ['file', $sqlPath, 'w'], ['pipe', 'w']],
         );
+        $this->dumpNormalizer->normalizeFile($sqlPath);
     }
 
     private function runMysqlStatement(string $sql): string
     {
         return $this->runProcess(
-            $this->mysqlCommand($this->mysqlBinary, null),
+            $this->mysqlStatementCommand(),
             [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']],
             $sql . ';',
         );
@@ -91,6 +157,19 @@ class MysqlClient
         return $command;
     }
 
+    /**
+     * @return array<int, string>
+     */
+    private function mysqlStatementCommand(): array
+    {
+        $command = $this->mysqlCommand($this->mysqlBinary, null);
+        $command[] = '--batch';
+        $command[] = '--skip-column-names';
+        $command[] = '--raw';
+
+        return $command;
+    }
+
     private function resolveBinary(string $binary): string
     {
         if (is_file($binary)) {
@@ -102,6 +181,11 @@ class MysqlClient
         }
 
         return $binary;
+    }
+
+    private function escapeIdentifier(string $identifier): string
+    {
+        return str_replace('`', '``', $identifier);
     }
 
     /**
