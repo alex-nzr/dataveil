@@ -29,7 +29,8 @@ class BackupAnonymizationService
      *     dry_run: bool,
      *     keep_temp: bool,
      *     mysql_bin: string,
-     *     mysqldump_bin: string
+     *     mysqldump_bin: string,
+     *     progress_callback?: callable(string, array<string, mixed>): void
      * } $options
      * @return array<string, mixed>
      */
@@ -87,7 +88,7 @@ class BackupAnonymizationService
             }
 
             if (!$options['dry_run']) {
-                (new AnonymizerService($runtimeConfig))->anonymize();
+                (new AnonymizerService($runtimeConfig, $options['progress_callback'] ?? null))->anonymize();
                 $exportPath = $workDirectory . DIRECTORY_SEPARATOR . 'anonymized.sql';
                 $mysql->exportSql($tempDatabase, $exportPath);
                 $this->archiveHandler->pack($archive, $exportPath, $outputPath);
