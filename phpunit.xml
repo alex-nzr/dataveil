@@ -3,9 +3,7 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true"
-         cacheDirectory=""
-         executionOrder="default"
-         requireCoverageMetadata="false">
+         executionOrder="default">
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
@@ -15,11 +13,11 @@
         </testsuite>
     </testsuites>
 
-    <source>
+    <coverage>
         <include>
             <directory>src</directory>
         </include>
-    </source>
+    </coverage>
 
     <php>
         <env name="APP_ENV" value="test"/>

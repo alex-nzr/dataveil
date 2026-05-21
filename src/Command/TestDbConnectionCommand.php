@@ -19,9 +19,12 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 class TestDbConnectionCommand extends Command
 {
-    public function __construct(
-        private readonly ?ConnectionDiagnostics $diagnostics = null,
-    ) {
+    private ?ConnectionDiagnostics $diagnostics;
+
+    public function __construct(?ConnectionDiagnostics $diagnostics = null)
+    {
+        $this->diagnostics = $diagnostics;
+
         parent::__construct();
     }
 

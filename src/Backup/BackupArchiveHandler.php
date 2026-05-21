@@ -10,9 +10,11 @@ use RecursiveIteratorIterator;
 
 class BackupArchiveHandler
 {
-    public function __construct(
-        private readonly BackupNameResolver $nameResolver = new BackupNameResolver(),
-    ) {
+    private BackupNameResolver $nameResolver;
+
+    public function __construct(?BackupNameResolver $nameResolver = null)
+    {
+        $this->nameResolver = $nameResolver ?? new BackupNameResolver();
     }
 
     public function unpack(string $inputPath, string $workDirectory): BackupArchive

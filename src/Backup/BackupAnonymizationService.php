@@ -12,12 +12,21 @@ use DataVeil\Exception\DataVeilException;
 
 class BackupAnonymizationService
 {
+    private BackupArchiveHandler $archiveHandler;
+    private BackupNameResolver $nameResolver;
+    private TemporaryDatabaseGuard $guard;
+    private ConnectionFactory $connectionFactory;
+
     public function __construct(
-        private readonly BackupArchiveHandler $archiveHandler = new BackupArchiveHandler(),
-        private readonly BackupNameResolver $nameResolver = new BackupNameResolver(),
-        private readonly TemporaryDatabaseGuard $guard = new TemporaryDatabaseGuard(),
-        private readonly ConnectionFactory $connectionFactory = new ConnectionFactory(),
+        ?BackupArchiveHandler $archiveHandler = null,
+        ?BackupNameResolver $nameResolver = null,
+        ?TemporaryDatabaseGuard $guard = null,
+        ?ConnectionFactory $connectionFactory = null
     ) {
+        $this->archiveHandler = $archiveHandler ?? new BackupArchiveHandler();
+        $this->nameResolver = $nameResolver ?? new BackupNameResolver();
+        $this->guard = $guard ?? new TemporaryDatabaseGuard();
+        $this->connectionFactory = $connectionFactory ?? new ConnectionFactory();
     }
 
     /**
@@ -29,7 +38,8 @@ class BackupAnonymizationService
      *     dry_run: bool,
      *     keep_temp: bool,
      *     mysql_bin: string,
-     *     mysqldump_bin: string
+     *     mysqldump_bin: string,
+     *     progress_callback?: callable(string, array<string, mixed>): void
      * } $options
      * @return array<string, mixed>
      */
@@ -87,7 +97,7 @@ class BackupAnonymizationService
             }
 
             if (!$options['dry_run']) {
-                (new AnonymizerService($runtimeConfig))->anonymize();
+                (new AnonymizerService($runtimeConfig, $options['progress_callback'] ?? null))->anonymize();
                 $exportPath = $workDirectory . DIRECTORY_SEPARATOR . 'anonymized.sql';
                 $mysql->exportSql($tempDatabase, $exportPath);
                 $this->archiveHandler->pack($archive, $exportPath, $outputPath);

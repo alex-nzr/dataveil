@@ -23,9 +23,12 @@ class AnonymizeCommand extends Command
 {
     //private Configuration $config;
 
-    public function __construct(
-        private readonly ?AnonymizationPreflight $preflight = null,
-    ) {
+    private ?AnonymizationPreflight $preflight;
+
+    public function __construct(?AnonymizationPreflight $preflight = null)
+    {
+        $this->preflight = $preflight;
+
         parent::__construct();
     }
 
@@ -73,7 +76,7 @@ class AnonymizeCommand extends Command
         $io->info('Starting database anonymization...');
 
         try {
-            $anonymizer = new AnonymizerService($config);
+            $anonymizer = new AnonymizerService($config, $this->createProgressCallback($io));
             $anonymizer->anonymize();
             $io->success('Anonymization completed successfully');
         } catch (\Exception $e) {
@@ -82,6 +85,103 @@ class AnonymizeCommand extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @return callable(string, array<string, mixed>): void
+     */
+    private function createProgressCallback(SymfonyStyle $io): callable
+    {
+        return function (string $event, array $payload) use ($io): void {
+            if ($event === 'rule_start') {
+                $io->writeln(sprintf(
+                    '[%d/%d] %s table %s: rows=%d, fields=%d',
+                    (int) ($payload['rule'] ?? 0),
+                    (int) ($payload['rules'] ?? 0),
+                    (string) ($payload['action'] ?? ''),
+                    (string) ($payload['table'] ?? ''),
+                    (int) ($payload['rows'] ?? 0),
+                    (int) ($payload['fields'] ?? 0),
+                ));
+
+                return;
+            }
+
+            if ($event === 'rule_progress') {
+                $io->writeln(sprintf(
+                    '  %s: processed=%d, remaining=%d, elapsed=%s',
+                    (string) ($payload['table'] ?? ''),
+                    (int) ($payload['processed'] ?? 0),
+                    (int) ($payload['remaining'] ?? 0),
+                    $this->formatDuration((float) ($payload['seconds'] ?? 0.0)),
+                ));
+
+                return;
+            }
+
+            if ($event === 'rule_done') {
+                $io->writeln(sprintf(
+                    '  done %s: processed=%d/%d, elapsed=%s',
+                    (string) ($payload['table'] ?? ''),
+                    (int) ($payload['processed'] ?? 0),
+                    (int) ($payload['rows'] ?? 0),
+                    $this->formatDuration((float) ($payload['seconds'] ?? 0.0)),
+                ));
+
+                return;
+            }
+
+            if ($event === 'consistency_start') {
+                $io->writeln(sprintf('Consistency groups: %d', (int) ($payload['groups'] ?? 0)));
+
+                return;
+            }
+
+            if ($event === 'consistency_group_start') {
+                $io->writeln(sprintf(
+                    '[group %d/%d] %s anchor %s: rows=%d, targets=%d',
+                    (int) ($payload['group'] ?? 0),
+                    (int) ($payload['groups'] ?? 0),
+                    (string) ($payload['id'] ?? ''),
+                    (string) ($payload['anchor_table'] ?? ''),
+                    (int) ($payload['rows'] ?? 0),
+                    (int) ($payload['targets'] ?? 0),
+                ));
+
+                return;
+            }
+
+            if ($event === 'consistency_group_progress') {
+                $io->writeln(sprintf(
+                    '  group %s: processed=%d, remaining=%d, elapsed=%s',
+                    (string) ($payload['id'] ?? ''),
+                    (int) ($payload['processed'] ?? 0),
+                    (int) ($payload['remaining'] ?? 0),
+                    $this->formatDuration((float) ($payload['seconds'] ?? 0.0)),
+                ));
+
+                return;
+            }
+
+            if ($event === 'consistency_group_done') {
+                $io->writeln(sprintf(
+                    '  done group %s: processed=%d/%d, elapsed=%s',
+                    (string) ($payload['id'] ?? ''),
+                    (int) ($payload['processed'] ?? 0),
+                    (int) ($payload['rows'] ?? 0),
+                    $this->formatDuration((float) ($payload['seconds'] ?? 0.0)),
+                ));
+            }
+        };
+    }
+
+    private function formatDuration(float $seconds): string
+    {
+        if ($seconds < 60) {
+            return sprintf('%.1fs', $seconds);
+        }
+
+        return sprintf('%dm %02ds', (int) floor($seconds / 60), (int) floor($seconds) % 60);
     }
 
     private function showDryRunInfo(Configuration $config, SymfonyStyle $io): int

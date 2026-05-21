@@ -13,15 +13,21 @@ class ConsistencyProcessor
     private Connection $connection;
     private StrategyManager $strategyManager;
     private SerializerHandler $serializerHandler;
+    /**
+     * @var callable(string, array<string, mixed>): void|null
+     */
+    private $progressCallback;
 
     public function __construct(
         Connection $connection,
         StrategyManager $strategyManager,
-        SerializerHandler $serializerHandler
+        SerializerHandler $serializerHandler,
+        ?callable $progressCallback = null
     ) {
         $this->connection = $connection;
         $this->strategyManager = $strategyManager;
         $this->serializerHandler = $serializerHandler;
+        $this->progressCallback = $progressCallback;
     }
 
     /**
@@ -29,19 +35,23 @@ class ConsistencyProcessor
      */
     public function processConsistencyGroups(array $groups): void
     {
-        foreach ($groups as $group) {
-            $this->processConsistencyGroup($group);
+        $totalGroups = count($groups);
+
+        foreach ($groups as $index => $group) {
+            $this->processConsistencyGroup($group, $index + 1, $totalGroups);
         }
     }
 
     /**
      * @param      array<mixed>  $group
      */
-    private function processConsistencyGroup(array $group): void
+    private function processConsistencyGroup(array $group, int $groupNumber, int $totalGroups): void
     {
+        $startedAt = microtime(true);
         $anchor = $group['anchor'];
         $generator = $group['generator'];
         $targets = $group['targets'];
+        $groupId = (string) ($group['id'] ?? '');
 
         $anchorTable = $anchor['table'];
         $idColumn = $anchor['id_column'];
@@ -54,6 +64,18 @@ class ConsistencyProcessor
         $deterministic = $generator['deterministic'] ?? false;
 
         $anchorData = $this->fetchAnchorData($anchorTable, $idColumn, $contextColumns, $filters);
+        $rowsTotal = count($anchorData);
+        $processed = 0;
+        $progressInterval = $this->progressInterval($rowsTotal);
+
+        $this->emitProgress('consistency_group_start', [
+            'group' => $groupNumber,
+            'groups' => $totalGroups,
+            'id' => $groupId,
+            'anchor_table' => $anchorTable,
+            'targets' => count($targets),
+            'rows' => $rowsTotal,
+        ]);
 
         foreach ($anchorData as $anchorRow) {
             $anchorRow['_table'] = $anchorTable;
@@ -74,7 +96,64 @@ class ConsistencyProcessor
                     $anchorId
                 );
             }
+
+            $processed++;
+            if ($this->shouldReportProgress($processed, $rowsTotal, $progressInterval)) {
+                $this->emitProgress('consistency_group_progress', [
+                    'group' => $groupNumber,
+                    'groups' => $totalGroups,
+                    'id' => $groupId,
+                    'anchor_table' => $anchorTable,
+                    'processed' => $processed,
+                    'rows' => $rowsTotal,
+                    'remaining' => max(0, $rowsTotal - $processed),
+                    'seconds' => microtime(true) - $startedAt,
+                ]);
+            }
         }
+
+        $this->emitProgress('consistency_group_done', [
+            'group' => $groupNumber,
+            'groups' => $totalGroups,
+            'id' => $groupId,
+            'anchor_table' => $anchorTable,
+            'processed' => $processed,
+            'rows' => $rowsTotal,
+            'remaining' => 0,
+            'seconds' => microtime(true) - $startedAt,
+        ]);
+    }
+
+    private function progressInterval(int $rowsTotal): int
+    {
+        if ($rowsTotal >= 100000) {
+            return 10000;
+        }
+
+        if ($rowsTotal >= 10000) {
+            return 1000;
+        }
+
+        return 100;
+    }
+
+    private function shouldReportProgress(int $processed, int $rowsTotal, int $progressInterval): bool
+    {
+        return $processed === 1
+            || $processed === $rowsTotal
+            || ($progressInterval > 0 && $processed % $progressInterval === 0);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function emitProgress(string $event, array $payload = []): void
+    {
+        if ($this->progressCallback === null) {
+            return;
+        }
+
+        ($this->progressCallback)($event, $payload);
     }
 
     /**

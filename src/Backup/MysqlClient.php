@@ -9,20 +9,27 @@ use DataVeil\Exception\DataVeilException;
 class MysqlClient
 {
     /**
+     * @var array{host: string, login: string, password: string, port?: string}
+     */
+    private array $params;
+    private SqlDumpNormalizer $dumpNormalizer;
+    private string $mysqlBinary;
+    private string $mysqldumpBinary;
+
+    /**
      * @param array{host: string, login: string, password: string, port?: string} $params
      */
     public function __construct(
-        private readonly array $params,
+        array $params,
         string $mysqlBinary = 'mysql',
         string $mysqldumpBinary = 'mysqldump',
-        private readonly SqlDumpNormalizer $dumpNormalizer = new SqlDumpNormalizer(),
+        ?SqlDumpNormalizer $dumpNormalizer = null
     ) {
+        $this->params = $params;
+        $this->dumpNormalizer = $dumpNormalizer ?? new SqlDumpNormalizer();
         $this->mysqlBinary = $this->resolveBinary($mysqlBinary);
         $this->mysqldumpBinary = $this->resolveBinary($mysqldumpBinary);
     }
-
-    private string $mysqlBinary;
-    private string $mysqldumpBinary;
 
     public function createDatabase(string $database): void
     {

@@ -6,13 +6,26 @@ namespace DataVeil\Backup;
 
 class BackupArchive
 {
+    public string $workDirectory;
+    public string $mainSqlPath;
+    public ?string $afterConnectPath;
+    public ?string $mainSqlArchivePath;
+    public ?string $afterConnectArchivePath;
+    public bool $isArchive;
+
     public function __construct(
-        public readonly string $workDirectory,
-        public readonly string $mainSqlPath,
-        public readonly ?string $afterConnectPath,
-        public readonly ?string $mainSqlArchivePath,
-        public readonly ?string $afterConnectArchivePath,
-        public readonly bool $isArchive,
+        string $workDirectory,
+        string $mainSqlPath,
+        ?string $afterConnectPath,
+        ?string $mainSqlArchivePath,
+        ?string $afterConnectArchivePath,
+        bool $isArchive
     ) {
+        $this->workDirectory = $workDirectory;
+        $this->mainSqlPath = $mainSqlPath;
+        $this->afterConnectPath = $afterConnectPath;
+        $this->mainSqlArchivePath = $mainSqlArchivePath;
+        $this->afterConnectArchivePath = $afterConnectArchivePath;
+        $this->isArchive = $isArchive;
     }
 }
